@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Model files (large)
+*.pth
+*.pt
+*.pkl
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Results
+*.png
+*.jpg
+*.jpeg
+confusion_matrix.png
+results/
+
+# Virtual environments
+venv/
+env/
+ENV/
+

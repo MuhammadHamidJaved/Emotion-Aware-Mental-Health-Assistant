@@ -1,0 +1,27 @@
+Django==5.1.3
+djangorestframework==3.15.2
+djangorestframework-simplejwt==5.3.1
+django-cors-headers==4.6.0
+Pillow==11.1.0
+python-decouple==3.8
+psycopg2-binary==2.9.10
+dj-database-url==2.3.0
+cloudinary==1.41.0
+cryptography==42.0.5
+# RAG Chat Bot dependencies
+# Core langchain packages - install in this order
+# Use 0.3.78+ to satisfy langchain-openai (dependency of langchain-pinecone)
+langchain-core==0.3.78
+langchain==0.3.7
+langchain-pinecone==0.2.13
+langchain-google-genai==2.0.11
+langchain-huggingface==0.3.1
+# Vector store and AI
+# Use newer pinecone package (not pinecone-client) for langchain-pinecone compatibility
+pinecone[grpc]>=6.0.0
+# google-generativeai will be installed by langchain-google-genai
+# Embeddings
+sentence-transformers==2.7.0
+torch==2.4.1
+transformers==4.45.0
+
