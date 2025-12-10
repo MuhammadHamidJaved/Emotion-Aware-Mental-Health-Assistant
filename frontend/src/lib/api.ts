@@ -334,6 +334,53 @@ export async function apiGetRecentEntries(
   }
 }
 
+// Journal Entries API types
+export type JournalEntry = {
+  id: number;
+  entry_type: 'text' | 'voice' | 'video';
+  title?: string;
+  text_content?: string;
+  transcription?: string;
+  emotion?: string;
+  emotion_confidence?: number;
+  tags?: string[];
+  entry_date: string;
+  created_at: string;
+  word_count?: number;
+  duration?: number;
+  is_favorite?: boolean;
+  is_draft?: boolean;
+};
+
+// Journal Entries API functions
+export async function apiGetJournalEntries(
+  accessToken: string,
+  entryType?: string,
+  emotion?: string
+): Promise<JournalEntry[]> {
+  try {
+    const params = new URLSearchParams();
+    if (entryType) params.append('type', entryType);
+    if (emotion) params.append('emotion', emotion);
+    
+    const url = `${API_URL}/api/journal/entries/${params.toString() ? '?' + params.toString() : ''}`;
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error('Failed to load journal entries.');
+    }
+
+    return res.json();
+  } catch (error) {
+    console.error('Error fetching journal entries:', error);
+    return [];
+  }
+}
+
 // Insights API types
 export type InsightsOverview = {
   overall_mood: number;
@@ -481,9 +528,11 @@ export type ProfileSettings = {
 };
 
 export type NotificationSettings = {
-  journal_reminders: boolean;
+  session_reminders: boolean;  // Changed from journal_reminders
   mood_insights: boolean;
   weekly_reports: boolean;
+  streak_alerts: boolean;
+  ai_suggestions: boolean;
   email_notifications: boolean;
   push_notifications: boolean;
 };
@@ -676,6 +725,188 @@ export async function apiDeleteAccount(accessToken: string): Promise<{ message: 
 
   if (!res.ok) {
     throw new Error('Failed to request account deletion.');
+  }
+
+  return res.json();
+}
+
+// Onboarding API types
+export type OnboardingData = {
+  storage: 'cloud' | 'local' | 'hybrid';
+  permissions: {
+    'storage'?: boolean;
+    'emotion-detection'?: boolean;
+    'voice'?: boolean;
+    'video'?: boolean;
+    'location'?: boolean;
+    'notifications'?: boolean;
+    'biometric'?: boolean;
+  };
+};
+
+export type OnboardingResponse = {
+  message: string;
+  storage: 'cloud' | 'local' | 'hybrid';
+  permissions: Record<string, boolean>;
+  onboarding_complete: boolean;
+};
+
+// Onboarding API functions
+export async function apiCompleteOnboarding(
+  accessToken: string,
+  data: OnboardingData
+): Promise<OnboardingResponse> {
+  const res = await fetch(`${API_URL}/api/auth/onboarding/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || errorData.message || 'Failed to complete onboarding.');
+  }
+
+  return res.json();
+}
+
+export async function apiGetOnboardingStatus(
+  accessToken: string
+): Promise<{
+  onboarding_complete: boolean;
+  storage: 'cloud' | 'local' | 'hybrid' | null;
+  permissions: Record<string, boolean>;
+}> {
+  const res = await fetch(`${API_URL}/api/auth/onboarding/`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to load onboarding status.');
+  }
+
+  return res.json();
+}
+
+// Notification API types
+export type Notification = {
+  id: number;
+  type: 'session_reminder' | 'mood_insight' | 'weekly_report' | 'streak_alert' | 'ai_suggestion' | 'recommendation' | 'system';
+  title: string;
+  message: string;
+  action_url?: string;
+  related_object_id?: number | null;
+  is_read: boolean;
+  read_at?: string | null;
+  metadata?: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type NotificationsResponse = {
+  notifications: Notification[];
+  count: number;
+  unread_count: number;
+};
+
+// Notification API functions
+export async function apiGetNotifications(
+  accessToken: string,
+  limit: number = 50,
+  unreadOnly: boolean = false
+): Promise<NotificationsResponse> {
+  const params = new URLSearchParams({
+    limit: limit.toString(),
+    unread_only: unreadOnly.toString(),
+  });
+
+  const res = await fetch(`${API_URL}/api/notifications/?${params}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to load notifications.');
+  }
+
+  return res.json();
+}
+
+export async function apiGetUnreadCount(accessToken: string): Promise<{ unread_count: number }> {
+  const res = await fetch(`${API_URL}/api/notifications/unread-count/`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to load unread count.');
+  }
+
+  return res.json();
+}
+
+export async function apiMarkNotificationAsRead(
+  accessToken: string,
+  notificationId?: number,
+  markAll?: boolean
+): Promise<{ message: string; count?: number }> {
+  const res = await fetch(`${API_URL}/api/notifications/mark-read/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      notification_id: notificationId,
+      mark_all: markAll,
+    }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to mark notification as read.');
+  }
+
+  return res.json();
+}
+
+export async function apiDeleteNotification(
+  accessToken: string,
+  notificationId: number
+): Promise<{ message: string }> {
+  const res = await fetch(`${API_URL}/api/notifications/${notificationId}/`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to delete notification.');
+  }
+
+  return res.json();
+}
+
+export async function apiClearAllNotifications(
+  accessToken: string
+): Promise<{ message: string; count: number }> {
+  const res = await fetch(`${API_URL}/api/notifications/clear/`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to clear notifications.');
   }
 
   return res.json();

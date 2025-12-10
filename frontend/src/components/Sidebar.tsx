@@ -20,17 +20,18 @@ import {
   ChevronLeft,
   ChevronRight,
   PlusCircle,
+  Bell,
 } from 'lucide-react';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/check-in/new', label: 'Express Yourself', icon: PlusCircle },
   { href: '/check-in', label: 'Check-In History', icon: Activity },
-  { href: '/detect', label: 'Detect Emotion', icon: Brain },
   { href: '/insights', label: 'Insights & Analytics', icon: LineChart },
   { href: '/chat', label: 'AI Companion', icon: MessageSquare },
   { href: '/recommendations', label: 'Recommendations', icon: Lightbulb },
   { href: '/calendar', label: 'Calendar', icon: Calendar },
+  { href: '/notifications', label: 'Notifications', icon: Bell },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

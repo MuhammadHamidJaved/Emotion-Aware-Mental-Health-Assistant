@@ -25,6 +25,7 @@ class UserSerializer(serializers.ModelSerializer):
             "preferred_journal_time",
             "enable_biometric",
             "enable_notifications",
+            "onboarding_complete",
             "total_entries",
             "current_streak",
             "longest_streak",
@@ -137,5 +138,45 @@ def get_tokens_for_user(user: User) -> dict:
         "refresh": str(refresh),
         "access": str(refresh.access_token),
     }
+
+
+class OnboardingSerializer(serializers.Serializer):
+    """
+    Serializer for onboarding data
+    Handles storage preference and feature permissions
+    """
+    storage = serializers.ChoiceField(
+        choices=['cloud', 'local', 'hybrid'],
+        required=True,
+        help_text='Storage preference: cloud, local, or hybrid'
+    )
+    permissions = serializers.DictField(
+        required=True,
+        help_text='Dictionary of feature permissions (e.g., {"emotion-detection": true, "voice": false})'
+    )
+    
+    def validate_storage(self, value):
+        """Validate storage choice"""
+        if value not in ['cloud', 'local', 'hybrid']:
+            raise serializers.ValidationError("Storage must be 'cloud', 'local', or 'hybrid'")
+        return value
+    
+    def validate_permissions(self, value):
+        """Validate permissions dictionary"""
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Permissions must be a dictionary")
+        
+        # Expected permission keys
+        valid_keys = [
+            'storage', 'emotion-detection', 'voice', 'video', 
+            'location', 'notifications', 'biometric'
+        ]
+        
+        # Check if all values are boolean
+        for key, val in value.items():
+            if not isinstance(val, bool):
+                raise serializers.ValidationError(f"Permission '{key}' must be a boolean value")
+        
+        return value
 
 

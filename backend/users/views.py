@@ -3,14 +3,17 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
+from django.utils import timezone
 import cloudinary.uploader
 
 from .serializers import (
     LoginSerializer,
     RegisterSerializer,
     UserSerializer,
+    OnboardingSerializer,
     get_tokens_for_user,
 )
+from .settings_models import UserPreferences
 
 
 class RegisterView(APIView):
@@ -129,3 +132,110 @@ class MeView(APIView):
 
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class OnboardingView(APIView):
+    """
+    POST /api/auth/onboarding/
+    
+    Saves user onboarding preferences including storage choice and feature permissions.
+    Marks the user's onboarding as complete.
+    """
+    
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        serializer = OnboardingSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        user = request.user
+        storage_choice = serializer.validated_data['storage']
+        permissions = serializer.validated_data['permissions']
+        
+        try:
+            # Get or create user preferences
+            preferences, created = UserPreferences.objects.get_or_create(user=user)
+            
+            # Store onboarding settings (storage + permissions)
+            onboarding_data = {
+                'storage': storage_choice,
+                'permissions': permissions,
+                'completed_at': timezone.now().isoformat()
+            }
+            preferences.set_onboarding_settings(onboarding_data)
+            preferences.save()
+            
+            # Update privacy settings with storage preference
+            privacy_settings = preferences.get_privacy_settings()
+            privacy_settings['storage_type'] = storage_choice
+            privacy_settings['cloud_backup'] = storage_choice in ['cloud', 'hybrid']
+            preferences.set_privacy_settings(privacy_settings)
+            preferences.save()
+            
+            # Update notification settings based on permissions
+            notification_settings = preferences.get_notification_settings()
+            notification_settings['push_notifications'] = permissions.get('notifications', False)
+            notification_settings['email_notifications'] = permissions.get('notifications', False)
+            preferences.set_notification_settings(notification_settings)
+            preferences.save()
+            
+            # Update user model fields based on permissions
+            user.enable_biometric = permissions.get('biometric', False)
+            user.enable_notifications = permissions.get('notifications', True)
+            user.onboarding_complete = True
+            user.save()
+            
+            return Response(
+                {
+                    "message": "Onboarding completed successfully.",
+                    "storage": storage_choice,
+                    "permissions": permissions,
+                    "onboarding_complete": True,
+                },
+                status=status.HTTP_200_OK,
+            )
+        
+        except Exception as e:
+            return Response(
+                {"detail": f"Failed to save onboarding preferences: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+    
+    def get(self, request):
+        """
+        GET /api/auth/onboarding/
+        
+        Returns the user's onboarding status and preferences.
+        """
+        user = request.user
+        
+        try:
+            preferences = UserPreferences.objects.filter(user=user).first()
+            
+            if not preferences:
+                return Response(
+                    {
+                        "onboarding_complete": user.onboarding_complete,
+                        "storage": None,
+                        "permissions": {},
+                    },
+                    status=status.HTTP_200_OK,
+                )
+            
+            onboarding_data = preferences.get_onboarding_settings()
+            
+            return Response(
+                {
+                    "onboarding_complete": user.onboarding_complete,
+                    "storage": onboarding_data.get('storage'),
+                    "permissions": onboarding_data.get('permissions', {}),
+                },
+                status=status.HTTP_200_OK,
+            )
+        
+        except Exception as e:
+            return Response(
+                {"detail": f"Failed to retrieve onboarding preferences: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

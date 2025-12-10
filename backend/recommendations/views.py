@@ -9,6 +9,7 @@ from django.utils import timezone
 from .models import AIChatMessage
 from .serializers import ChatMessageSerializer, ChatMessageCreateSerializer, ChatResponseSerializer
 from .rag_service import get_bot_instance
+from .notification_service import NotificationService
 import traceback
 import logging
 
@@ -82,6 +83,18 @@ def send_message(request):
         
         print("✅ Response sent to frontend")
         print("="*80 + "\n")
+        
+        # Create notification after AI response
+        try:
+            if NotificationService.should_send_notification(request.user, 'ai_suggestion'):
+                NotificationService.create_ai_suggestion(
+                    user=request.user,
+                    suggestion_text=f"AI Companion: {bot_response.get('answer', '')[:100]}...",
+                    context={'chat_message_id': ai_chat_message.id}
+                )
+                print("✅ Notification created for AI response")
+        except Exception as e:
+            print(f"⚠️ Failed to create notification: {e}")
         
         return Response({
             'user_message': ChatMessageSerializer(user_chat_message).data,

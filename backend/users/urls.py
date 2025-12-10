@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from .views import LoginView, MeView, RegisterView
+from .views import LoginView, MeView, RegisterView, OnboardingView
 from . import settings_views
 
 app_name = "users"
@@ -10,6 +10,7 @@ urlpatterns = [
     path("auth/register/", RegisterView.as_view(), name="auth-register"),
     path("auth/login/", LoginView.as_view(), name="auth-login"),
     path("auth/me/", MeView.as_view(), name="auth-me"),
+    path("auth/onboarding/", OnboardingView.as_view(), name="auth-onboarding"),
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
     
     # Settings endpoints

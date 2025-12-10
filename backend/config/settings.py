@@ -98,6 +98,13 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 NEON_DATABASE_URL = config("NEON_DATABASE_URL", default="")
 
+# Database configuration
+# If NEON_DATABASE_URL is set, use PostgreSQL (Neon)
+# Otherwise, fall back to SQLite for local development
+# 
+# To use SQLite temporarily (if Neon connection fails):
+# 1. Comment out or remove NEON_DATABASE_URL from your .env file
+# 2. Or set it to empty: NEON_DATABASE_URL=
 if NEON_DATABASE_URL:
     DATABASES = {
         "default": dj_database_url.parse(
@@ -106,6 +113,7 @@ if NEON_DATABASE_URL:
         )
     }
 else:
+    # Fall back to SQLite for local development
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
@@ -204,3 +212,10 @@ CORS_ALLOW_CREDENTIALS = True
 
 # Custom User Model
 AUTH_USER_MODEL = 'users.User'
+
+# Emotion Detection Microservice Settings
+EMOTION_MICROSERVICE_URL = config('EMOTION_MICROSERVICE_URL', default='http://localhost:8001')
+
+# Recommendation Microservice Settings
+RECOMMENDATION_MICROSERVICE_URL = config('RECOMMENDATION_MICROSERVICE_URL', default='http://localhost:5000/api')
+TEXT_EMOTION_MICROSERVICE_URL = config('TEXT_EMOTION_MICROSERVICE_URL', default='http://localhost:5001')

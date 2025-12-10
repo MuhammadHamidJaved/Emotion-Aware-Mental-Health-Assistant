@@ -25,8 +25,11 @@ import { Badge } from '@/components/ui/badge'
 const EMOTION_COLORS: Record<string, string> = {
   happy: '#FCD34D', sad: '#6366F1', angry: '#EF4444', anxious: '#EC4899',
   calm: '#60A5FA', excited: '#F97316', loved: '#F472B6', confident: '#A855F7',
-  frustrated: '#DC2626', grateful: '#34D399', lonely: '#6B7280', proud: '#8B5CF6',
-  scared: '#FB923C', surprised: '#FBBF24', energetic: '#F59E0B', peaceful: '#3B82F6'
+  frustrated: '#DC2626', grateful: '#34D399', lonely: '#9333EA', proud: '#C026D3',
+  scared: '#FB923C', surprised: '#FBBF24', surprise: '#FBBF24', // Both forms for surprise
+  energetic: '#F59E0B', peaceful: '#3B82F6', neutral: '#9CA3AF', // Added neutral - distinct gray
+  tired: '#64748B', fearful: '#B91C1C', disgusted: '#84CC16', disappointed: '#71717A',
+  contempt: '#8B5CF6' // Added contempt - purple color
 }
 
 export default function DashboardPage() {
@@ -42,9 +45,11 @@ export default function DashboardPage() {
     const emojiMap: Record<string, string> = {
       happy: '😊', sad: '😢', angry: '😠', anxious: '😰', calm: '😌', excited: '🤩',
       loved: '🥰', confident: '😎', frustrated: '😤', grateful: '🙏', lonely: '😔',
-      proud: '😌', scared: '😨', surprised: '😮', energetic: '⚡', peaceful: '☮️'
+      proud: '😌', scared: '😨', surprised: '😮', surprise: '😮', // Both forms
+      energetic: '⚡', peaceful: '☮️', neutral: '😐', // Added neutral
+      tired: '😴', fearful: '😨', disgusted: '🤢', disappointed: '😔'
     }
-    return emojiMap[emotion] || '😊'
+    return emojiMap[emotion?.toLowerCase()] || '😊'
   }
 
   useEffect(() => {
@@ -87,7 +92,11 @@ export default function DashboardPage() {
         // Mood trend will use defaults if failed
 
         if (results[2].status === 'fulfilled') {
-          setEmotionDistribution(results[2].value)
+          const distributionData = results[2].value
+          console.log('Emotion distribution data received:', distributionData)
+          setEmotionDistribution(distributionData)
+        } else {
+          console.warn('Emotion distribution API failed:', results[2].reason)
         }
         // Emotion distribution will use defaults if failed
 
@@ -125,8 +134,23 @@ export default function DashboardPage() {
     }
   })
 
-  // Default emotion distribution if empty
-  const emotionChartData = emotionDistribution.length > 0 ? emotionDistribution : []
+  // Default emotion distribution if empty - ensure data format is correct
+  const emotionChartData = emotionDistribution.length > 0 
+    ? emotionDistribution.map(item => ({
+        emotion: (item.emotion || '').trim(),
+        count: typeof item.count === 'number' ? item.count : parseInt(String(item.count)) || 0
+      })).filter(item => item.count > 0) // Filter out zero counts
+    : []
+  
+  // Debug: Log emotion distribution data
+  useEffect(() => {
+    if (emotionChartData.length > 0) {
+      console.log('Emotion Distribution Data (processed):', emotionChartData)
+      console.log('Total entries in chart:', emotionChartData.reduce((sum, item) => sum + item.count, 0))
+    } else {
+      console.log('No emotion distribution data available')
+    }
+  }, [emotionChartData])
 
   const personalizedRecs = [
     { id: 1, type: 'music', title: 'Calming Piano', icon: Music, color: 'purple', desc: 'Based on recent anxiety' },
@@ -375,12 +399,53 @@ export default function DashboardPage() {
               <ResponsiveContainer width="100%" height={180}>
                 {emotionChartData.length > 0 ? (
                   <PieChart>
-                    <Pie data={emotionChartData} dataKey="count" nameKey="emotion" cx="50%" cy="50%" outerRadius={70} label={false}>
-                      {emotionChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={EMOTION_COLORS[entry.emotion?.toLowerCase() || ''] || '#6B7280'} />
-                      ))}
+                    <Pie 
+                      data={emotionChartData} 
+                      dataKey="count" 
+                      nameKey="emotion" 
+                      cx="50%" 
+                      cy="50%" 
+                      outerRadius={70}
+                      innerRadius={0}
+                      paddingAngle={2}
+                      label={false}
+                      isAnimationActive={true}
+                      startAngle={90}
+                      endAngle={-270}
+                    >
+                      {emotionChartData.map((entry, index) => {
+                        // Normalize emotion name (handle both 'surprise' and 'surprised', etc.)
+                        const emotionKey = entry.emotion?.toLowerCase()?.trim() || '';
+                        const normalizedEmotion = emotionKey === 'surprise' ? 'surprised' : emotionKey;
+                        // Get color with fallback - ensure we always have a visible color
+                        const color = EMOTION_COLORS[normalizedEmotion] || EMOTION_COLORS[emotionKey] || '#6B7280';
+                        console.log(`Emotion: ${emotionKey}, Normalized: ${normalizedEmotion}, Color: ${color}, Count: ${entry.count}`);
+                        return (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={color}
+                            stroke="#fff"
+                            strokeWidth={2}
+                          />
+                        );
+                      })}
                     </Pie>
-                    <Tooltip contentStyle={{ fontSize: 12 }} />
+                    <Tooltip 
+                      contentStyle={{ 
+                        fontSize: 12, 
+                        backgroundColor: '#fff', 
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '6px',
+                        padding: '8px'
+                      }} 
+                      formatter={(value: any, name: any) => [`${value} entries`, name]}
+                      labelStyle={{ color: '#000', fontWeight: '600' }}
+                    />
+                    <Legend 
+                      wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }}
+                      formatter={(value) => value.charAt(0).toUpperCase() + value.slice(1)}
+                      iconType="square"
+                    />
                   </PieChart>
                 ) : (
                   <div className="flex items-center justify-center h-full text-sm text-neutral-500">

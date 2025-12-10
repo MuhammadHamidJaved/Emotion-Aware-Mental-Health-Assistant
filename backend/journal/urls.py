@@ -5,8 +5,15 @@ from django.urls import path
 from . import dashboard_views
 from . import insights_views
 from . import calendar_views
+from . import views
 
 urlpatterns = [
+    # Journal entry endpoints
+    path('journal/entries/', views.entries_list_or_create, name='journal-entries-list-create'),
+    path('journal/entries/<int:entry_id>/', views.entry_detail_update_delete, name='journal-entry-detail-update-delete'),
+    path('journal/emotion/detect/', views.detect_emotion_from_image, name='journal-emotion-detect'),
+    path('journal/emotion/detect/text/', views.detect_emotion_from_text, name='journal-emotion-detect-text'),
+    
     # Dashboard endpoints
     path('dashboard/stats/', dashboard_views.dashboard_stats, name='dashboard-stats'),
     path('dashboard/mood-trend/', dashboard_views.mood_trend, name='dashboard-mood-trend'),

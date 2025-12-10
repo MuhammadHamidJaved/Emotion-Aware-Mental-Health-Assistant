@@ -31,6 +31,9 @@ class User(AbstractUser):
     current_streak = models.IntegerField(default=0)
     longest_streak = models.IntegerField(default=0)
     
+    # Onboarding
+    onboarding_complete = models.BooleanField(default=False)
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     

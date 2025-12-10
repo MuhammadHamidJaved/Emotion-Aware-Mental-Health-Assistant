@@ -29,6 +29,9 @@ class UserPreferences(models.Model):
     # Appearance settings (stored as JSON, encrypted)
     appearance_settings = models.TextField(blank=True, help_text='Encrypted JSON')
     
+    # Onboarding settings (stored as JSON, encrypted)
+    onboarding_settings = models.TextField(blank=True, help_text='Encrypted JSON - storage preference and feature permissions')
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -100,4 +103,25 @@ class UserPreferences(models.Model):
             logger.error(f"Encryption service not available: {e}")
             import json
             self.appearance_settings = json.dumps(settings)
+    
+    def get_onboarding_settings(self) -> dict:
+        """Decrypt and return onboarding settings"""
+        try:
+            from .encryption import get_encryption_service
+            service = get_encryption_service()
+            return service.decrypt_json(self.onboarding_settings) if self.onboarding_settings else {}
+        except ImportError as e:
+            logger.error(f"Encryption service not available: {e}")
+            return {}
+    
+    def set_onboarding_settings(self, settings: dict):
+        """Encrypt and store onboarding settings"""
+        try:
+            from .encryption import get_encryption_service
+            service = get_encryption_service()
+            self.onboarding_settings = service.encrypt_json(settings)
+        except ImportError as e:
+            logger.error(f"Encryption service not available: {e}")
+            import json
+            self.onboarding_settings = json.dumps(settings)
 

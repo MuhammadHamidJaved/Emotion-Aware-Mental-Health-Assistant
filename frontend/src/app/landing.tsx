@@ -53,7 +53,7 @@ export default function Home() {
               Start Free Trial
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
-            <Link href="/detect" className="px-8 py-4 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors font-medium">
+            <Link href="/check-in/new" className="px-8 py-4 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors font-medium">
               Try Live Demo
             </Link>
           </div>
@@ -344,7 +344,7 @@ export default function Home() {
               <ul className="space-y-2 text-sm text-neutral-600">
                 <li><a href="#features">Features</a></li>
                 <li><a href="/ml-models">ML Models</a></li>
-                <li><a href="/detect">Live Demo</a></li>
+                <li><a href="/check-in/new">Live Demo</a></li>
                 <li><a href="/dashboard">Dashboard</a></li>
               </ul>
             </div>

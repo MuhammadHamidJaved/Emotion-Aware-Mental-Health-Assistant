@@ -36,9 +36,11 @@ export default function SettingsPage() {
 
   // Notification Settings
   const [notifications, setNotifications] = useState<NotificationSettings>({
-    journal_reminders: true,
+    session_reminders: true,  // Changed from journal_reminders
     mood_insights: true,
     weekly_reports: false,
+    streak_alerts: true,
+    ai_suggestions: true,
     email_notifications: true,
     push_notifications: false,
   });
@@ -368,37 +370,62 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="space-y-4">
-                    {Object.entries(notifications).map(([key, value]) => (
-                      <div key={key} className="flex items-center justify-between py-3 border-b border-gray-100">
-                        <div>
-                          <div className="font-medium capitalize">
-                            {key.replace(/([A-Z])/g, ' $1').trim()}
+                    {Object.entries(notifications).map(([key, value]) => {
+                      // Format key for display (convert snake_case to Title Case)
+                      const displayName = key
+                        .split('_')
+                        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                        .join(' ');
+                      
+                      // Get description based on key
+                      const getDescription = (k: string) => {
+                        switch (k) {
+                          case 'session_reminders':
+                            return 'Reminders to log your emotional check-ins';
+                          case 'mood_insights':
+                            return 'Personalized insights about your mood patterns';
+                          case 'weekly_reports':
+                            return 'Weekly summary of your emotional wellness';
+                          case 'streak_alerts':
+                            return 'Notifications about your journaling streaks';
+                          case 'ai_suggestions':
+                            return 'Recommendations and suggestions from AI companion';
+                          case 'email_notifications':
+                            return 'Receive notifications via email';
+                          case 'push_notifications':
+                            return 'Receive push notifications on your device';
+                          default:
+                            return '';
+                        }
+                      };
+
+                      return (
+                        <div key={key} className="flex items-center justify-between py-3 border-b border-gray-100">
+                          <div>
+                            <div className="font-medium">
+                              {displayName}
+                            </div>
+                            <div className="text-sm text-gray-600 mt-1">
+                              {getDescription(key)}
+                            </div>
                           </div>
-                          <div className="text-sm text-gray-600 mt-1">
-                            {key === 'journalReminders' && 'Daily reminders for emotional check-ins'}
-                            {key === 'moodInsights' && 'Personalized insights about your mood patterns'}
-                            {key === 'weeklyReports' && 'Weekly summary of your emotional wellness'}
-                            {key === 'emailNotifications' && 'Receive notifications via email'}
-                            {key === 'pushNotifications' && 'Receive push notifications on your device'}
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => {
-                          const newKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
-                          setNotifications({ ...notifications, [newKey as keyof NotificationSettings]: !value });
-                        }}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            value ? 'bg-black' : 'bg-gray-300'
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              value ? 'translate-x-6' : 'translate-x-1'
+                          <button
+                            onClick={() => {
+                              setNotifications({ ...notifications, [key as keyof NotificationSettings]: !value });
+                            }}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                              value ? 'bg-black' : 'bg-gray-300'
                             }`}
-                          />
-                        </button>
-                      </div>
-                    ))}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                value ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -423,14 +450,14 @@ export default function SettingsPage() {
                         </div>
                       </div>
                       <button
-                        onClick={() => setPrivacy({ ...privacy, dataCollection: !privacy.dataCollection })}
+                        onClick={() => setPrivacy({ ...privacy, data_collection: !privacy.data_collection })}
                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          privacy.dataCollection ? 'bg-black' : 'bg-gray-300'
+                          privacy.data_collection ? 'bg-black' : 'bg-gray-300'
                         }`}
                       >
                         <span
                           className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            privacy.dataCollection ? 'translate-x-6' : 'translate-x-1'
+                            privacy.data_collection ? 'translate-x-6' : 'translate-x-1'
                           }`}
                         />
                       </button>
@@ -444,14 +471,14 @@ export default function SettingsPage() {
                         </div>
                       </div>
                       <button
-                        onClick={() => setPrivacy({ ...privacy, cloudBackup: !privacy.cloudBackup })}
+                        onClick={() => setPrivacy({ ...privacy, cloud_backup: !privacy.cloud_backup })}
                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          privacy.cloudBackup ? 'bg-black' : 'bg-gray-300'
+                          privacy.cloud_backup ? 'bg-black' : 'bg-gray-300'
                         }`}
                       >
                         <span
                           className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            privacy.cloudBackup ? 'translate-x-6' : 'translate-x-1'
+                            privacy.cloud_backup ? 'translate-x-6' : 'translate-x-1'
                           }`}
                         />
                       </button>
@@ -470,8 +497,8 @@ export default function SettingsPage() {
                             type="radio"
                             name="storage"
                             value={type}
-                            checked={privacy.storageType === type}
-                            onChange={(e) => setPrivacy({ ...privacy, storageType: e.target.value })}
+                            checked={privacy.storage_type === type}
+                            onChange={(e) => setPrivacy({ ...privacy, storage_type: e.target.value as 'cloud' | 'local' | 'hybrid' })}
                             className="w-4 h-4"
                           />
                           <div>
@@ -540,14 +567,14 @@ export default function SettingsPage() {
                       </div>
                     </div>
                     <button
-                      onClick={() => setTheme({ ...theme, moodAdaptive: !theme.moodAdaptive })}
+                      onClick={() => setTheme({ ...theme, mood_adaptive: !theme.mood_adaptive })}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        theme.moodAdaptive ? 'bg-black' : 'bg-gray-300'
+                        theme.mood_adaptive ? 'bg-black' : 'bg-gray-300'
                       }`}
                     >
                       <span
                         className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          theme.moodAdaptive ? 'translate-x-6' : 'translate-x-1'
+                          theme.mood_adaptive ? 'translate-x-6' : 'translate-x-1'
                         }`}
                       />
                     </button>
@@ -562,9 +589,9 @@ export default function SettingsPage() {
                       {['default', 'warm', 'cool'].map((scheme) => (
                         <button
                           key={scheme}
-                          onClick={() => setTheme({ ...theme, colorScheme: scheme })}
+                          onClick={() => setTheme({ ...theme, color_scheme: scheme as 'default' | 'warm' | 'cool' })}
                           className={`p-4 border-2 rounded-lg capitalize transition-colors ${
-                            theme.colorScheme === scheme
+                            theme.color_scheme === scheme
                               ? 'border-black bg-gray-50'
                               : 'border-gray-200 hover:border-gray-300'
                           }`}

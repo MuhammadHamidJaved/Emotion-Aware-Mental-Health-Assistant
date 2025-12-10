@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mood Recommendations</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --accent: #22d3ee;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --card: #1f2937;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Inter", system-ui, -apple-system, sans-serif;
+      background: radial-gradient(circle at 10% 20%, rgba(34,211,238,0.07), transparent 25%),
+                  radial-gradient(circle at 80% 0%, rgba(94,234,212,0.05), transparent 25%),
+                  var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 32px 16px;
+      display: flex;
+      justify-content: center;
+    }
+    .shell {
+      width: min(1100px, 100%);
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    h1 { margin: 0; font-size: 24px; letter-spacing: 0.5px; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+    }
+    form {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      align-items: end;
+    }
+    label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px; }
+    select, textarea, input {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: var(--card);
+      color: var(--text);
+      padding: 12px;
+      font-size: 14px;
+    }
+    textarea { min-height: 90px; resize: vertical; }
+    button {
+      background: linear-gradient(135deg, #22d3ee, #0ea5e9);
+      color: #0b1223;
+      border: none;
+      border-radius: 12px;
+      padding: 12px 18px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+      box-shadow: 0 10px 25px rgba(34,211,238,0.25);
+    }
+    button:hover { transform: translateY(-1px); box-shadow: 0 12px 28px rgba(34,211,238,0.32); }
+    button:active { transform: translateY(0); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+      margin-top: 18px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .card h3 { margin: 0; font-size: 15px; letter-spacing: 0.3px; color: #a5f3fc; }
+    ul { margin: 0; padding-left: 18px; color: var(--muted); }
+    li { margin: 4px 0; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .quote { font-style: italic; color: var(--text); }
+    .flex { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    iframe { border: 0; border-radius: 12px; width: 100%; min-height: 152px; }
+    .tracks { display: grid; gap: 8px; }
+    .track { padding: 10px; border-radius: 10px; background: rgba(255,255,255,0.03); }
+    .track-title { font-weight: 600; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(34,211,238,0.12); color: #67e8f9; padding: 4px 10px; border-radius: 20px; font-size: 12px; }
+    .error { color: #fca5a5; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <h1>Mood-based Recommendations</h1>
+      <span class="badge">Powered by Spotify + APIs</span>
+    </header>
+
+    <div class="panel">
+      <form id="recommend-form">
+        <div>
+          <label for="user">User ID</label>
+          <input id="user" name="user" type="text" value="demo-user" />
+        </div>
+        <div>
+          <label for="emotion">Emotion</label>
+          <select id="emotion" name="emotion">
+            <option>happy</option>
+            <option>sad</option>
+            <option>angry</option>
+            <option>stressed</option>
+            <option>neutral</option>
+            <option>fear</option>
+            <option>surprise</option>
+            <option>disgust</option>
+          </select>
+        </div>
+        <div>
+          <label for="context">Context (JSON)</label>
+          <textarea id="context" name="context" placeholder='{"time_of_day":"night"}'></textarea>
+        </div>
+        <div>
+          <button type="submit">Get Recommendations</button>
+        </div>
+      </form>
+      <div id="error" class="error"></div>
+    </div>
+
+    <div id="results" class="grid" style="display:none;">
+      <div class="card" id="music-card">
+        <h3>Music</h3>
+        <div id="playlist-embed" class="muted">No playlist available.</div>
+        <div class="tracks" id="tracks"></div>
+      </div>
+      <div class="card" id="quote-card">
+        <h3>Quote</h3>
+        <div id="quote" class="quote muted">—</div>
+      </div>
+      <div class="card" id="activity-card">
+        <h3>Activity</h3>
+        <div id="activity" class="muted">—</div>
+      </div>
+      <div class="card" id="exercise-card">
+        <h3>Exercises</h3>
+        <ul id="exercises"></ul>
+      </div>
+      <div class="card" id="meditation-card">
+        <h3>Meditation</h3>
+        <div id="meditations" class="muted">—</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('recommend-form');
+    const results = document.getElementById('results');
+    const errorEl = document.getElementById('error');
+    const playlistEmbed = document.getElementById('playlist-embed');
+    const tracksEl = document.getElementById('tracks');
+    const quoteEl = document.getElementById('quote');
+    const activityEl = document.getElementById('activity');
+    const exercisesEl = document.getElementById('exercises');
+    const meditationsEl = document.getElementById('meditations');
+
+    const API_URL = 'http://127.0.0.1:5000/api/recommend';
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorEl.textContent = '';
+      results.style.display = 'none';
+
+      let ctxObj = {};
+      const ctxText = document.getElementById('context').value.trim();
+      if (ctxText) {
+        try {
+          ctxObj = JSON.parse(ctxText);
+        } catch (err) {
+          errorEl.textContent = 'Context must be valid JSON.';
+          return;
+        }
+      }
+
+      const payload = {
+        user_id: document.getElementById('user').value || 'demo-user',
+        emotion: document.getElementById('emotion').value,
+        context: ctxObj,
+      };
+
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const detail = await res.json().catch(() => ({}));
+          throw new Error(detail.detail || 'Request failed');
+        }
+        const data = await res.json();
+        render(data.recommendations);
+        results.style.display = 'grid';
+      } catch (err) {
+        errorEl.textContent = err.message || 'Something went wrong';
+      }
+    });
+
+    function render(rec) {
+      // Music
+      playlistEmbed.innerHTML = 'No playlist available.';
+      tracksEl.innerHTML = '';
+
+      if (rec.music && (rec.music.playlist_url || (rec.music.tracks && rec.music.tracks.length))) {
+        if (rec.music.playlist_url) {
+          const embedUrl = rec.music.playlist_url.replace('open.spotify.com/playlist/', 'open.spotify.com/embed/playlist/');
+          playlistEmbed.innerHTML = `<iframe src="${embedUrl}" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture" loading="lazy"></iframe>`;
+        } else {
+          playlistEmbed.textContent = 'Playlist not available.';
+        }
+
+        if (Array.isArray(rec.music.tracks)) {
+          rec.music.tracks.forEach(track => {
+            const div = document.createElement('div');
+            div.className = 'track';
+            const embedTrackUrl = track.url ? track.url.replace('open.spotify.com/track/', 'open.spotify.com/embed/track/') : null;
+            div.innerHTML = `
+              <div class="track-title">${track.title || 'Unknown title'}</div>
+              <div class="muted">${track.artist || 'Unknown artist'}</div>
+              <div class="flex">
+                ${track.url ? `<a href="${track.url}" target="_blank">Open in Spotify</a>` : ''}
+                ${track.preview_url ? `<audio controls src="${track.preview_url}" preload="none"></audio>` : ''}
+              </div>
+              ${embedTrackUrl ? `<iframe src="${embedTrackUrl}" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture" loading="lazy" style="min-height:80px;"></iframe>` : ''}
+            `;
+            tracksEl.appendChild(div);
+          });
+        }
+      }
+
+      // Quote
+      quoteEl.textContent = rec.quote || '—';
+
+      // Activity
+      activityEl.textContent = rec.activity || '—';
+
+      // Exercises
+      exercisesEl.innerHTML = '';
+      if (Array.isArray(rec.exercise) && rec.exercise.length) {
+        rec.exercise.forEach(ex => {
+          const li = document.createElement('li');
+          li.innerHTML = `<strong>${ex.name}</strong>${ex.category ? ` • ${ex.category}` : ''}`;
+          exercisesEl.appendChild(li);
+        });
+      } else {
+        exercisesEl.innerHTML = '<li class="muted">No exercises available</li>';
+      }
+
+      // Meditation
+      if (Array.isArray(rec.meditation) && rec.meditation.length) {
+        meditationsEl.innerHTML = '';
+        rec.meditation.forEach(med => {
+          const row = document.createElement('div');
+          row.innerHTML = med.url ? `<a href="${med.url}" target="_blank">${med.name}</a>` : med.name;
+          meditationsEl.appendChild(row);
+        });
+      } else {
+        meditationsEl.textContent = 'No meditation links available (API not configured).';
+      }
+    }
+  </script>
+</body>
+</html>

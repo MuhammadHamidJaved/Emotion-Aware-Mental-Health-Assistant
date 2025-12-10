@@ -56,7 +56,7 @@ export default function Home() {
               Start Free Trial
               <ArrowRight className="w-5 h-5" />
             </Link>
-            <Link href="/detect" className="px-6 py-3 bg-white border-2 border-gray-200 text-gray-800 font-medium rounded-lg hover:border-gray-400 transition-colors">
+            <Link href="/check-in/new" className="px-6 py-3 bg-white border-2 border-gray-200 text-gray-800 font-medium rounded-lg hover:border-gray-400 transition-colors">
               Try Live Demo
             </Link>
           </div>
@@ -426,7 +426,7 @@ export default function Home() {
               <ul className="space-y-2 text-sm text-gray-600">
                 <li><a href="#features" className="hover:text-black transition-colors">Features</a></li>
                 <li><a href="/ml-models" className="hover:text-black transition-colors">ML Models</a></li>
-                <li><a href="/detect" className="hover:text-black transition-colors">Live Demo</a></li>
+                <li><a href="/check-in/new" className="hover:text-black transition-colors">Live Demo</a></li>
                 <li><a href="/dashboard" className="hover:text-black transition-colors">Dashboard</a></li>
               </ul>
             </div>

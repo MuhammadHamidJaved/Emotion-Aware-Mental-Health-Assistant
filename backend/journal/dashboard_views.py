@@ -6,6 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Count, Q, Avg, Max
+from django.db.models import QuerySet
 from django.utils import timezone
 from datetime import timedelta
 from collections import Counter
@@ -18,6 +19,8 @@ try:
     from emotions.models import EmotionDetection, MoodCheckIn
 except ImportError as e:
     logger.error(f"Import error: {e}")
+    EmotionDetection = None
+    MoodCheckIn = None
 
 
 @api_view(['GET'])
@@ -77,9 +80,27 @@ def dashboard_stats(request):
         dominant_emotion = 'neutral'
     
     # ML predictions count (total emotion detections)
-    ml_predictions_count = EmotionDetection.objects.filter(
-        entry__user=user
-    ).count()
+    # First try to count EmotionDetection records
+    if EmotionDetection:
+        try:
+            ml_predictions_count = EmotionDetection.objects.filter(
+                entry__user=user
+            ).count()
+        except Exception as e:
+            logger.warning(f"Error counting EmotionDetection records: {e}")
+            # Fallback: count entries with emotions
+            ml_predictions_count = JournalEntry.objects.filter(
+                user=user,
+                is_draft=False,
+                emotion__isnull=False
+            ).exclude(emotion='').count()
+    else:
+        # Fallback: count entries with emotions if EmotionDetection model doesn't exist
+        ml_predictions_count = JournalEntry.objects.filter(
+            user=user,
+            is_draft=False,
+            emotion__isnull=False
+        ).exclude(emotion='').count()
     
     return Response({
         'total_entries': total_entries,
@@ -123,8 +144,13 @@ def mood_trend(request):
     for i in range(days):
         date = (timezone.now() - timedelta(days=days - 1 - i)).date()
         
-        # Get detections for this date
-        day_detections = detections.filter(detected_at__date=date)
+        # Get detections for this date (check both detected_at and entry date)
+        day_detections = detections.filter(
+            Q(detected_at__date=date) | Q(entry__entry_date__date=date)
+        )
+        
+        # Also get entries for this date as fallback
+        day_entries = entries.filter(entry_date__date=date).exclude(emotion='').exclude(emotion__isnull=True)
         
         if day_detections.exists():
             avg_valence = day_detections.aggregate(avg=Avg('valence'))['avg'] or 0
@@ -139,6 +165,53 @@ def mood_trend(request):
                 'avgValence': round(valence_0_10, 2),
                 'avgArousal': round(arousal_0_10, 2)
             })
+        elif day_entries.exists():
+            # Fallback: calculate from entry emotions
+            emotion_to_valence_arousal = {
+                'happy': (0.8, 0.7),
+                'sad': (-0.6, 0.3),
+                'angry': (-0.4, 0.9),
+                'anxious': (-0.5, 0.8),
+                'calm': (0.2, 0.2),
+                'excited': (0.7, 0.9),
+                'neutral': (0.0, 0.3),
+                'surprised': (0.3, 0.9),
+                'surprise': (0.3, 0.9),
+                'fearful': (-0.7, 0.9),
+                'disgusted': (-0.5, 0.6),
+                'contempt': (-0.3, 0.4),
+                'frustrated': (-0.4, 0.8),
+                'grateful': (0.7, 0.5),
+                'loved': (0.9, 0.6),
+                'confident': (0.6, 0.7),
+                'tired': (-0.2, 0.2),
+                'lonely': (-0.5, 0.3),
+                'scared': (-0.6, 0.9),
+                'disappointed': (-0.4, 0.4),
+                'energetic': (0.6, 0.9),
+                'peaceful': (0.3, 0.2),
+            }
+            
+            valences = []
+            arousals = []
+            for entry in day_entries:
+                emotion_lower = entry.emotion.lower() if entry.emotion else 'neutral'
+                base_valence, base_arousal = emotion_to_valence_arousal.get(emotion_lower, (0.0, 0.5))
+                confidence = entry.emotion_confidence if entry.emotion_confidence else 0.5
+                valences.append(base_valence * confidence)
+                arousals.append(base_arousal * confidence)
+            
+            if valences:
+                avg_valence = sum(valences) / len(valences)
+                avg_arousal = sum(arousals) / len(arousals)
+                valence_0_10 = ((avg_valence + 1) / 2) * 10
+                arousal_0_10 = avg_arousal * 10
+                
+                result.append({
+                    'date': date.strftime('%Y-%m-%d'),
+                    'avgValence': round(valence_0_10, 2),
+                    'avgArousal': round(arousal_0_10, 2)
+                })
         else:
             # No data for this day, return neutral values
             result.append({
@@ -175,18 +248,24 @@ def emotion_distribution(request):
             emotion__isnull=False
         ).exclude(emotion='')
         
-        # Count emotions
-        emotion_counts = Counter([entry.emotion for entry in entries if entry.emotion])
+        # Count emotions (normalize to lowercase for consistency)
+        emotion_counts = Counter([
+            entry.emotion.lower().strip() if entry.emotion else None
+            for entry in entries 
+            if entry.emotion and entry.emotion.strip()
+        ])
         
         # Convert to array format
         result = [
             {'emotion': emotion, 'count': count}
             for emotion, count in emotion_counts.items()
+            if emotion  # Filter out None values
         ]
         
         # Sort by count descending
         result.sort(key=lambda x: x['count'], reverse=True)
         
+        logger.info(f"Emotion distribution for user {user.id}: {result}")
         return Response(result, status=status.HTTP_200_OK)
     except Exception as e:
         # Field doesn't exist yet, return empty array
