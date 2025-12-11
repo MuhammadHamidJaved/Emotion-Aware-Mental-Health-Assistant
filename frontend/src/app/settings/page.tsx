@@ -342,16 +342,16 @@ export default function SettingsPage() {
                       <h3 className="font-semibold mb-4">Your Statistics</h3>
                       <div className="grid grid-cols-3 gap-4">
                         <div className="text-center p-4 bg-gray-50 rounded-lg">
-                          <div className="text-2xl font-bold">{profileData.total_entries}</div>
+                          <div className="text-2xl font-bold">{profileData.total_entries || 0}</div>
                           <div className="text-sm text-gray-600">Total Entries</div>
                         </div>
                         <div className="text-center p-4 bg-gray-50 rounded-lg">
-                          <div className="text-2xl font-bold">{profileData.current_streak}</div>
+                          <div className="text-2xl font-bold">{profileData.current_streak || 0}</div>
                           <div className="text-sm text-gray-600">Day Streak</div>
                         </div>
                         <div className="text-center p-4 bg-gray-50 rounded-lg">
-                          <div className="text-2xl font-bold">-</div>
-                          <div className="text-sm text-gray-600">Mood Score</div>
+                          <div className="text-2xl font-bold">{profileData.longest_streak || 0}</div>
+                          <div className="text-sm text-gray-600">Longest Streak</div>
                         </div>
                       </div>
                     </div>

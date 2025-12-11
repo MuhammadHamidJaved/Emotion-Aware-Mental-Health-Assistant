@@ -947,12 +947,15 @@ def entries_list_or_create(request):
                     else:
                         break
                 
-                # Update user's streak if it's higher
-                if streak > request.user.current_streak:
-                    request.user.current_streak = streak
-                    if streak > request.user.longest_streak:
-                        request.user.longest_streak = streak
-                    request.user.save()
+                # Update user stats
+                request.user.total_entries = JournalEntry.objects.filter(
+                    user=request.user,
+                    is_draft=False
+                ).count()
+                request.user.current_streak = streak
+                if streak > request.user.longest_streak:
+                    request.user.longest_streak = streak
+                request.user.save()
                 
                 # Create streak alert notification for milestones
                 # Check if notification should be sent based on user preferences

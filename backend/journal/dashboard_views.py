@@ -346,8 +346,13 @@ def recent_entries(request):
                 detection = detections.get(entry.id)
                 confidence = int(detection.confidence * 100) if detection and detection.confidence else None
                 
-                # Get preview text from encrypted field - decrypt it
-                text_content = entry.get_text_content_display() or ''
+                # Get preview text - handle both encrypted and plain text gracefully
+                try:
+                    text_content = entry.get_text_content_display() or ''
+                except Exception as decrypt_error:
+                    logger.warning(f"Could not decrypt text for entry {entry.id}: {decrypt_error}")
+                    text_content = ''
+                
                 if text_content and len(text_content) > 100:
                     preview = text_content[:100] + '...'
                 else:
@@ -372,9 +377,20 @@ def recent_entries(request):
                     'type': entry.entry_type
                 })
             except Exception as e:
-                # Skip this entry if there's an error processing it
+                # Log but continue - we want to show what we can
                 logger.warning(f"Error processing entry {entry.id}: {str(e)}")
-                continue
+                # Still add the entry with minimal data
+                try:
+                    result.append({
+                        'id': entry.id,
+                        'date': str(entry.entry_date)[:10] if entry.entry_date else '',
+                        'emotion': getattr(entry, 'emotion', 'neutral'),
+                        'preview': 'Content unavailable',
+                        'confidence': None,
+                        'type': getattr(entry, 'entry_type', 'text')
+                    })
+                except:
+                    continue
         
         return Response(result, status=status.HTTP_200_OK)
     except Exception as e:

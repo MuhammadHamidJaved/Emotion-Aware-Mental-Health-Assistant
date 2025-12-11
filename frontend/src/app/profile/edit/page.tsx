@@ -93,66 +93,68 @@ export default function EditProfilePage() {
 
   return (
     <ProtectedPage>
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div className="max-w-2xl mx-auto space-y-4 pt-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-6">
           <button
             type="button"
             onClick={() => router.push('/profile')}
-            className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-black"
+            className="inline-flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to profile
           </button>
-          <h1 className="text-xl font-semibold text-gray-900">Edit Profile</h1>
+          <h1 className="text-2xl font-bold text-neutral-900">Edit Profile</h1>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-6">
-          {/* Avatar */}
-          <div className="flex items-center gap-6">
-            <div className="relative">
-              <div className="w-24 h-24 bg-gray-200 rounded-full overflow-hidden flex items-center justify-center text-3xl font-bold text-gray-600">
-                {previewUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={previewUrl} alt={fullName} className="w-full h-full object-cover" />
-                ) : (
-                  <span>{fullName.charAt(0).toUpperCase()}</span>
-                )}
+        <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
+          {/* Avatar Section */}
+          <div className="p-6 border-b border-neutral-100">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full overflow-hidden flex items-center justify-center text-2xl font-bold text-white">
+                  {previewUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={previewUrl} alt={fullName} className="w-full h-full object-cover" />
+                  ) : (
+                    <span>{fullName.charAt(0).toUpperCase()}</span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="absolute -bottom-1 -right-1 w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center hover:bg-indigo-700 transition-colors shadow-lg"
+                  onClick={() => document.getElementById('edit-profile-avatar-input')?.click()}
+                >
+                  <Camera className="w-4 h-4" />
+                </button>
+                <input
+                  id="edit-profile-avatar-input"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setAvatarFile(file);
+                    if (file) {
+                      setPreviewUrl(URL.createObjectURL(file));
+                    }
+                  }}
+                />
               </div>
-              <button
-                type="button"
-                className="absolute bottom-0 right-0 w-8 h-8 bg-black text-white rounded-full flex items-center justify-center hover:bg-gray-800 transition-colors"
-                onClick={() => document.getElementById('edit-profile-avatar-input')?.click()}
-              >
-                <Camera className="w-4 h-4" />
-              </button>
-              <input
-                id="edit-profile-avatar-input"
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0] || null;
-                  setAvatarFile(file);
-                  if (file) {
-                    setPreviewUrl(URL.createObjectURL(file));
-                  }
-                }}
-              />
-            </div>
 
-            <div className="text-sm text-gray-600">
-              <p className="font-medium text-gray-900 mb-1">Profile photo</p>
-              <p>Upload a clear photo of yourself. JPG, PNG or GIF, up to 2MB.</p>
+              <div className="text-sm">
+                <p className="font-medium text-neutral-900 mb-1">Profile photo</p>
+                <p className="text-xs text-neutral-500">Upload a clear photo of yourself. JPG, PNG or GIF, up to 2MB.</p>
+              </div>
             </div>
           </div>
 
           {/* Form fields */}
-          <div className="space-y-6">
+          <div className="p-6 space-y-5">
             {/* Basic info */}
             <div className="grid md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-neutral-700 mb-1.5">
                   Full name
                 </label>
                 <input
@@ -160,12 +162,12 @@ export default function EditProfilePage() {
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   disabled={isLoading}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none"
+                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-neutral-700 mb-1.5">
                   Date of birth
                 </label>
                 <input
@@ -173,39 +175,39 @@ export default function EditProfilePage() {
                   value={dateOfBirth}
                   onChange={(e) => setDateOfBirth(e.target.value)}
                   disabled={isLoading}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none"
+                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-neutral-700 mb-1.5">
                   Phone number
                 </label>
-                <div className="flex items-center gap-2">
-                  <Phone className="w-4 h-4 text-gray-400" />
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="tel"
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
                     disabled={isLoading}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none"
+                    className="w-full pl-10 pr-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-neutral-700 mb-1.5">
                   Preferred check-in time
                 </label>
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-gray-400" />
+                <div className="relative">
+                  <Clock className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     placeholder="e.g. Evenings, 9:00 PM"
                     value={preferredTime}
                     onChange={(e) => setPreferredTime(e.target.value)}
                     disabled={isLoading}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none"
+                    className="w-full pl-10 pr-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                   />
                 </div>
               </div>
@@ -213,67 +215,67 @@ export default function EditProfilePage() {
 
             {/* Bio */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-neutral-700 mb-1.5">
                 Bio
               </label>
               <textarea
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
-                rows={4}
+                rows={3}
                 disabled={isLoading}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none resize-none"
+                className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none transition-all"
               />
             </div>
 
             {/* Mental health concerns & goals */}
             <div className="grid md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
-                  <List className="w-4 h-4 text-gray-400" />
+                <label className="block text-sm font-medium text-neutral-700 mb-1 flex items-center gap-1.5">
+                  <List className="w-4 h-4 text-neutral-400" />
                   Mental health focus areas
                 </label>
-                <p className="text-xs text-gray-500 mb-2">
+                <p className="text-xs text-neutral-500 mb-2">
                   Separate with commas, e.g. anxiety, stress, sleep.
                 </p>
                 <textarea
                   value={mentalConcerns}
                   onChange={(e) => setMentalConcerns(e.target.value)}
-                  rows={3}
+                  rows={2}
                   disabled={isLoading}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none resize-none"
+                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
-                  <List className="w-4 h-4 text-gray-400" />
+                <label className="block text-sm font-medium text-neutral-700 mb-1 flex items-center gap-1.5">
+                  <List className="w-4 h-4 text-neutral-400" />
                   Wellness goals
                 </label>
-                <p className="text-xs text-gray-500 mb-2">
+                <p className="text-xs text-neutral-500 mb-2">
                   Separate with commas, e.g. daily reflection, gratitude.
                 </p>
                 <textarea
                   value={journalingGoals}
                   onChange={(e) => setJournalingGoals(e.target.value)}
-                  rows={3}
+                  rows={2}
                   disabled={isLoading}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none resize-none"
+                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none transition-all"
                 />
               </div>
             </div>
 
             {/* Toggles */}
-            <div className="grid md:grid-cols-2 gap-4">
-              <label className="flex items-center justify-between px-4 py-3 border border-gray-200 rounded-lg cursor-pointer">
+            <div className="grid md:grid-cols-2 gap-3">
+              <label className="flex items-center justify-between px-4 py-3 border border-neutral-200 rounded-lg cursor-pointer hover:bg-neutral-50 transition-colors">
                 <div>
-                  <div className="text-sm font-medium text-gray-900">Biometric login</div>
-                  <div className="text-xs text-gray-500">Use Face ID / fingerprint where supported.</div>
+                  <div className="text-sm font-medium text-neutral-900">Biometric login</div>
+                  <div className="text-xs text-neutral-500">Face ID / fingerprint</div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setEnableBiometric((v) => !v)}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    enableBiometric ? 'bg-black' : 'bg-gray-300'
+                    enableBiometric ? 'bg-indigo-600' : 'bg-neutral-300'
                   }`}
                 >
                   <span
@@ -284,16 +286,16 @@ export default function EditProfilePage() {
                 </button>
               </label>
 
-              <label className="flex items-center justify-between px-4 py-3 border border-gray-200 rounded-lg cursor-pointer">
+              <label className="flex items-center justify-between px-4 py-3 border border-neutral-200 rounded-lg cursor-pointer hover:bg-neutral-50 transition-colors">
                 <div>
-                  <div className="text-sm font-medium text-gray-900">Notifications</div>
-                  <div className="text-xs text-gray-500">Reminders, insights, and streak updates.</div>
+                  <div className="text-sm font-medium text-neutral-900">Notifications</div>
+                  <div className="text-xs text-neutral-500">Reminders & updates</div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setEnableNotifications((v) => !v)}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    enableNotifications ? 'bg-black' : 'bg-gray-300'
+                    enableNotifications ? 'bg-indigo-600' : 'bg-neutral-300'
                   }`}
                 >
                   <span
@@ -307,11 +309,11 @@ export default function EditProfilePage() {
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+          <div className="flex justify-end gap-3 p-4 bg-neutral-50 border-t border-neutral-100">
             <button
               type="button"
               onClick={() => router.push('/profile')}
-              className="px-5 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50"
+              className="px-4 py-2 border border-neutral-300 rounded-lg text-sm font-medium text-neutral-700 hover:bg-white transition-colors"
             >
               Cancel
             </button>
@@ -319,7 +321,7 @@ export default function EditProfilePage() {
               type="button"
               onClick={handleSave}
               disabled={isSaving || isLoading || !fullName.trim()}
-              className="inline-flex items-center gap-2 px-5 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-gray-900 disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isSaving ? (
                 <>

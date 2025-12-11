@@ -44,3 +44,36 @@ class User(AbstractUser):
     
     def __str__(self):
         return self.username
+    
+    def update_stats(self):
+        """Update user statistics from journal entries"""
+        from journal.models import JournalEntry
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        # Update total entries
+        self.total_entries = JournalEntry.objects.filter(user=self, is_draft=False).count()
+        
+        # Calculate current streak
+        today = timezone.now().date()
+        current_streak = 0
+        check_date = today
+        
+        # Check consecutive days (up to 365 days)
+        for _ in range(365):
+            has_entry = JournalEntry.objects.filter(
+                user=self,
+                is_draft=False,
+                entry_date__date=check_date
+            ).exists()
+            
+            if has_entry:
+                current_streak += 1
+            else:
+                break
+            
+            check_date -= timedelta(days=1)
+        
+        self.current_streak = current_streak
+        self.longest_streak = max(self.longest_streak, current_streak)
+        self.save()

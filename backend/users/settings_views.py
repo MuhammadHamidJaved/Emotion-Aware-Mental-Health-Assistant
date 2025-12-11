@@ -28,6 +28,13 @@ def settings_profile(request):
     user = request.user
     
     if request.method == 'GET':
+        # Update user stats if they're not set (for existing users)
+        if user.total_entries == 0:
+            try:
+                user.update_stats()
+            except Exception as e:
+                logger.warning(f"Could not update user stats: {e}")
+        
         # Return decrypted profile data
         bio = ""
         phone_number = ""

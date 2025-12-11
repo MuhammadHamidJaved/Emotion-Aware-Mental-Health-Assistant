@@ -101,8 +101,11 @@ export default function DashboardPage() {
         // Emotion distribution will use defaults if failed
 
         if (results[3].status === 'fulfilled') {
-          setRecentEntries(results[3].value)
+          const recentData = results[3].value
+          console.log('Recent entries data received:', recentData)
+          setRecentEntries(recentData)
         } else {
+          console.error('Recent entries API failed:', results[3].reason)
           // Set empty array if it fails
           setRecentEntries([])
         }
@@ -195,20 +198,16 @@ export default function DashboardPage() {
                     I'm your emotion-aware assistant. I provide emotional support and personalized recommendations to help you understand and manage your feelings. <span className="text-xs italic text-neutral-600">(Note: I'm not a replacement for professional therapists or psychiatrists.)</span>
                   </p>
 
-                  {/* Check-In Prompt */}
-                  {needsCheckIn && (
-                    <div className="mb-4 p-3 bg-white/80 rounded-lg border border-indigo-200">
-                      <p className="text-sm font-medium text-neutral-800 mb-2">
-                        💬 How are you feeling today?
-                      </p>
-                      <p className="text-xs text-neutral-600 mb-3">
-                        {recentEntries.length === 0 
-                          ? "Express yourself - I'll detect your emotions and provide personalized support. Choose any method you're comfortable with."
-                          : "It's been a while since your last check-in. A quick update helps me provide better emotional support."
-                        }
-                      </p>
-                      <p className="text-xs font-medium text-neutral-700 mb-2">Choose how you'd like to express yourself:</p>
-                      <div className="grid grid-cols-3 gap-2 mb-3">
+                  {/* Check-In Prompt - Always visible */}
+                  <div className="mb-4 p-3 bg-white/80 rounded-lg border border-indigo-200">
+                    <p className="text-sm font-medium text-neutral-800 mb-2">
+                      💬 How are you feeling today?
+                    </p>
+                    <p className="text-xs text-neutral-600 mb-3">
+                      Express yourself - I'll detect your emotions and provide personalized support. Choose any method you're comfortable with.
+                    </p>
+                    <p className="text-xs font-medium text-neutral-700 mb-2">Choose how you'd like to express yourself:</p>
+                    <div className="grid grid-cols-3 gap-2 mb-3">
                         <Link href="/check-in/new">
                           <div className="p-2 bg-white rounded-lg border border-neutral-200 hover:border-indigo-400 hover:shadow-sm transition-all cursor-pointer text-center">
                             <Type className="w-4 h-4 mx-auto mb-1 text-indigo-600" />
@@ -227,15 +226,16 @@ export default function DashboardPage() {
                             <p className="text-xs font-medium">Video</p>
                           </div>
                         </Link>
-                      </div>
                     </div>
-                  )}
+                  </div>
 
-                  {/* How Can I Help Section */}
+                  {/* How can I help you section */}
                   <div className="mt-4">
-                    <p className="text-sm font-medium text-neutral-700 mb-3">💡 How can I help you today?</p>
+                    <p className="text-sm font-medium text-neutral-800 mb-3 flex items-center gap-2">
+                      💡 How can I help you today?
+                    </p>
                     <div className="grid grid-cols-3 gap-2">
-                      <Link href="/chat">
+                      <Link href="/companion">
                         <div className="p-3 bg-white/80 rounded-lg border border-neutral-200 hover:border-indigo-300 hover:shadow-sm transition-all cursor-pointer text-center">
                           <MessageCircle className="w-5 h-5 mx-auto mb-1.5 text-indigo-600" />
                           <p className="text-xs font-medium">Chat</p>
@@ -501,7 +501,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-base flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-purple-600" />
-                Personalized for You
+                Recommendations for You
               </CardTitle>
               <Link href="/recommendations">
                 <Button variant="ghost" size="sm" className="h-7 text-xs">

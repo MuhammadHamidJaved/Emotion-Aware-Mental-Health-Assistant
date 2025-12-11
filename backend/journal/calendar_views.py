@@ -191,10 +191,21 @@ def calendar_day_details(request):
                 if detection:
                     emotion = detection.get_dominant_emotion()
             
+            # Get decrypted content
+            try:
+                title = entry.get_title_display() or 'Untitled Entry'
+                text_content = entry.get_text_content_display() or ''
+                if text_content and len(text_content) > 200:
+                    text_content = text_content[:200] + '...'
+            except Exception as decrypt_error:
+                logger.warning(f"Could not decrypt entry {entry.id}: {decrypt_error}")
+                title = 'Untitled Entry'
+                text_content = ''
+            
             result.append({
                 'id': entry.id,
-                'title': entry.title or 'Untitled Entry',
-                'text_content': entry.text_content[:200] + '...' if entry.text_content and len(entry.text_content) > 200 else (entry.text_content or ''),
+                'title': title,
+                'text_content': text_content,
                 'emotion': emotion or 'neutral',
                 'entry_type': entry.entry_type,
                 'entry_date': entry.entry_date.isoformat(),

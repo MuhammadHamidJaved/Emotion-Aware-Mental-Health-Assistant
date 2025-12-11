@@ -83,7 +83,11 @@ class MeView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
     def get(self, request):
-        return Response(UserSerializer(request.user).data, status=status.HTTP_200_OK)
+        user = request.user
+        # Update stats if they haven't been calculated yet
+        if user.total_entries == 0:
+            user.update_stats()
+        return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
 
     def patch(self, request):
         """
