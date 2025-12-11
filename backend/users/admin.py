@@ -10,7 +10,7 @@ class UserAdmin(BaseUserAdmin):
     list_filter = ('is_staff', 'is_superuser', 'is_active', 'date_joined')
     fieldsets = BaseUserAdmin.fieldsets + (
         ('Profile', {'fields': ('profile_picture', 'bio', 'phone_number', 'date_of_birth')}),
-        ('Preferences', {'fields': ('preferred_journal_time', 'enable_biometric', 'enable_notifications')}),
+        ('Preferences', {'fields': ('preferred_checkin_time', 'enable_biometric', 'enable_notifications')}),
         ('Stats', {'fields': ('total_entries', 'current_streak', 'longest_streak')}),
     )
 

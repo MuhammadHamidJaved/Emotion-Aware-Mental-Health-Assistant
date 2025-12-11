@@ -20,12 +20,14 @@ class JournalEntry(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='journal_entries')
     entry_type = models.CharField(max_length=10, choices=ENTRY_TYPES, default='text')
     
-    # Content
-    title = models.CharField(max_length=200, blank=True)
-    text_content = models.TextField(blank=True)
-    voice_file = models.FileField(upload_to='voice_entries/', null=True, blank=True)
-    video_file = models.FileField(upload_to='video_entries/', null=True, blank=True)
-    transcription = models.TextField(blank=True)
+    # Content - Encrypted only (plain text fields removed for security)
+    title_encrypted = models.TextField(blank=True, help_text='Encrypted title')
+    text_content_encrypted = models.TextField(blank=True, help_text='Encrypted text content')
+    transcription_encrypted = models.TextField(blank=True, help_text='Encrypted transcription')
+    
+    # Media files - Cloudinary URLs
+    voice_file = models.URLField(max_length=500, null=True, blank=True, help_text='Cloudinary URL for voice file')
+    video_file = models.URLField(max_length=500, null=True, blank=True, help_text='Cloudinary URL for video file')
     
     # Metadata
     word_count = models.IntegerField(default=0)
@@ -58,6 +60,57 @@ class JournalEntry(models.Model):
     
     def __str__(self):
         return f"{self.user.username} - {self.entry_date.strftime('%Y-%m-%d %H:%M')}"
+    
+    def set_title(self, plaintext_title: str):
+        """Set encrypted title"""
+        if plaintext_title:
+            from users.encryption import get_encryption_service
+            encryption_service = get_encryption_service()
+            self.title_encrypted = encryption_service.encrypt(plaintext_title)
+        else:
+            self.title_encrypted = ""
+    
+    def get_title(self) -> str:
+        """Get decrypted title"""
+        if self.title_encrypted:
+            from users.encryption import get_encryption_service
+            encryption_service = get_encryption_service()
+            return encryption_service.decrypt(self.title_encrypted)
+        return ""  # Return empty string if no encrypted title
+    
+    def set_text_content(self, plaintext_content: str):
+        """Set encrypted text content"""
+        if plaintext_content:
+            from users.encryption import get_encryption_service
+            encryption_service = get_encryption_service()
+            self.text_content_encrypted = encryption_service.encrypt(plaintext_content)
+        else:
+            self.text_content_encrypted = ""
+    
+    def get_text_content(self) -> str:
+        """Get decrypted text content"""
+        if self.text_content_encrypted:
+            from users.encryption import get_encryption_service
+            encryption_service = get_encryption_service()
+            return encryption_service.decrypt(self.text_content_encrypted)
+        return ""  # Return empty string if no encrypted content
+    
+    def set_transcription(self, plaintext_transcription: str):
+        """Set encrypted transcription"""
+        if plaintext_transcription:
+            from users.encryption import get_encryption_service
+            encryption_service = get_encryption_service()
+            self.transcription_encrypted = encryption_service.encrypt(plaintext_transcription)
+        else:
+            self.transcription_encrypted = ""
+    
+    def get_transcription(self) -> str:
+        """Get decrypted transcription"""
+        if self.transcription_encrypted:
+            from users.encryption import get_encryption_service
+            encryption_service = get_encryption_service()
+            return encryption_service.decrypt(self.transcription_encrypted)
+        return ""  # Return empty string if no encrypted transcription
 
 
 class EntryMedia(models.Model):

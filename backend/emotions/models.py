@@ -60,9 +60,9 @@ class EmotionDetection(models.Model):
         return max(emotions, key=emotions.get)
 
 
-class MoodCheckIn(models.Model):
+class QuickMoodLog(models.Model):
     """
-    Quick mood check-ins throughout the day
+    Quick mood check-ins throughout the day (simple mood tracking)
     """
     MOOD_CHOICES = (
         ('happy', 'Happy 😊'),
@@ -75,7 +75,7 @@ class MoodCheckIn(models.Model):
         ('loved', 'Loved 😍'),
     )
     
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='mood_checkins')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='quick_mood_logs')
     mood = models.CharField(max_length=20, choices=MOOD_CHOICES)
     intensity = models.IntegerField(default=5, help_text='1-10 scale')
     note = models.CharField(max_length=200, blank=True)
@@ -83,10 +83,10 @@ class MoodCheckIn(models.Model):
     checked_in_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
-        db_table = 'mood_checkins'
+        db_table = 'quick_mood_logs'
         ordering = ['-checked_in_at']
-        verbose_name = 'Mood Check-in'
-        verbose_name_plural = 'Mood Check-ins'
+        verbose_name = 'Quick Mood Log'
+        verbose_name_plural = 'Quick Mood Logs'
     
     def __str__(self):
         return f"{self.user.username} - {self.mood} at {self.checked_in_at.strftime('%Y-%m-%d %H:%M')}"

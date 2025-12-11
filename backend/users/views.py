@@ -121,10 +121,10 @@ class MeView(APIView):
             items = [s.strip() for s in concerns.split(",") if s.strip()]
             data["mental_health_concerns"] = items
 
-        goals = data.get("journaling_goals")
+        goals = data.get("mood_tracking_goals")
         if isinstance(goals, str):
             items = [s.strip() for s in goals.split(",") if s.strip()]
-            data["journaling_goals"] = items
+            data["mood_tracking_goals"] = items
 
         serializer = UserSerializer(user, data=data, partial=True)
         if not serializer.is_valid():

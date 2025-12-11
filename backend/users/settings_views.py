@@ -159,7 +159,7 @@ def settings_notifications(request):
         settings = preferences.get_notification_settings()
         # Return default settings if empty
         default_settings = {
-            'session_reminders': True,  # Changed from journal_reminders
+            'session_reminders': True,  # Changed from checkin_reminders
             'mood_insights': True,
             'weekly_reports': False,
             'streak_alerts': True,

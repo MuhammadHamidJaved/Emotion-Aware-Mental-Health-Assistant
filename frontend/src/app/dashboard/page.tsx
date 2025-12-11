@@ -175,7 +175,7 @@ export default function DashboardPage() {
 
   return (
     <ProtectedPage>
-      <div className="space-y-4">
+      <div className="space-y-4 pt-6">
         {/* Assistant Greeting Card - PRIMARY FOCUS */}
         {!isLoading && (
           <Card className="border-indigo-200 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 overflow-hidden">
@@ -530,44 +530,6 @@ export default function DashboardPage() {
                 )
               })}
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Express Yourself - All Methods Equal */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Express Yourself</CardTitle>
-            <p className="text-xs text-neutral-600 mt-1">
-              Choose any method you're comfortable with - all are equally effective:
-            </p>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="grid grid-cols-3 gap-2">
-              <Link href="/check-in/new">
-                <div className="p-3 rounded-lg border-2 border-neutral-200 hover:border-indigo-400 hover:shadow-md transition-all cursor-pointer text-center bg-white">
-                  <Type className="w-5 h-5 mx-auto mb-1.5 text-indigo-600" />
-                  <p className="text-xs font-medium mb-0.5">Text</p>
-                  <p className="text-xs text-neutral-500">Quick & private</p>
-                </div>
-              </Link>
-              <Link href="/check-in/new?type=voice">
-                <div className="p-3 rounded-lg border-2 border-neutral-200 hover:border-indigo-400 hover:shadow-md transition-all cursor-pointer text-center bg-white">
-                  <Mic className="w-5 h-5 mx-auto mb-1.5 text-indigo-600" />
-                  <p className="text-xs font-medium mb-0.5">Voice</p>
-                  <p className="text-xs text-neutral-500">Natural expression</p>
-                </div>
-              </Link>
-              <Link href="/check-in/new?type=video">
-                <div className="p-3 rounded-lg border-2 border-neutral-200 hover:border-indigo-400 hover:shadow-md transition-all cursor-pointer text-center bg-white">
-                  <Video className="w-5 h-5 mx-auto mb-1.5 text-indigo-600" />
-                  <p className="text-xs font-medium mb-0.5">Video</p>
-                  <p className="text-xs text-neutral-500">Most accurate</p>
-                </div>
-              </Link>
-            </div>
-            <p className="text-xs text-neutral-500 mt-3 text-center italic">
-              💡 We provide emotional support, not therapy. For professional help, please consult a licensed therapist or psychiatrist.
-            </p>
           </CardContent>
         </Card>
         </>

@@ -24,7 +24,7 @@ class NotificationService:
         metadata: dict = None
     ) -> Notification:
         """
-        Create a new notification for a user
+        Create a new notification for a user with encryption
         
         Args:
             user: User object
@@ -42,13 +42,16 @@ class NotificationService:
             notification = Notification.objects.create(
                 user=user,
                 type=notification_type,
-                title=title,
-                message=message,
                 action_url=action_url or '',
                 related_object_id=related_object_id,
-                metadata=metadata or {}
             )
-            logger.info(f"Created notification for user {user.username}: {title}")
+            # Set encrypted fields
+            notification.set_title(title)
+            notification.set_message(message)
+            notification.set_metadata(metadata or {})
+            notification.save()
+            
+            logger.info(f"Created encrypted notification for user {user.username}: {title}")
             return notification
         except Exception as e:
             logger.error(f"Failed to create notification: {e}")

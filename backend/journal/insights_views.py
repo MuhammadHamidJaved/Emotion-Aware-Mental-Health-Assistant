@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from .models import JournalEntry
-    from emotions.models import EmotionDetection, MoodCheckIn
+    from emotions.models import EmotionDetection
     from users.models import User
 except ImportError as e:
     logger.error(f"Import error: {e}")
@@ -148,21 +148,26 @@ def insights_overview(request):
         total_entries = current_entries.count()
         avg_entries_per_day = round(total_entries / days, 1) if days > 0 else 0
         
-        # Calculate best streak
-        best_streak = 0
-        current_date = end_date.date()
-        check_date = current_date
-        current_streak = 0
+        # Calculate best streak - optimized version
+        # Get all entry dates for the last 90 days (reduced from 365 for performance)
+        streak_start_date = end_date - timedelta(days=90)
+        entry_dates = JournalEntry.objects.filter(
+            user=user,
+            is_draft=False,
+            entry_date__gte=streak_start_date,
+            entry_date__lte=end_date
+        ).values_list('entry_date__date', flat=True).distinct().order_by('-entry_date__date')
         
-        # Check last 365 days for longest streak
-        for i in range(365):
-            entries_today = JournalEntry.objects.filter(
-                user=user,
-                is_draft=False,
-                entry_date__date=check_date
-            ).exists()
-            
-            if entries_today:
+        # Convert to set for O(1) lookup
+        entry_dates_set = set(entry_dates)
+        
+        best_streak = 0
+        current_streak = 0
+        check_date = end_date.date()
+        
+        # Check last 90 days efficiently
+        for i in range(90):
+            if check_date in entry_dates_set:
                 current_streak += 1
                 best_streak = max(best_streak, current_streak)
             else:
@@ -211,24 +216,31 @@ def insights_mood_timeline(request):
     try:
         start_date = timezone.now() - timedelta(days=days)
         
-        # Get emotion detections
+        # Get emotion detections with select_related for optimization
         detections = EmotionDetection.objects.filter(
             entry__user=user,
             entry__is_draft=False,
             detected_at__gte=start_date
-        )
+        ).select_related('entry')
+        
+        # Group detections by date for efficient lookup
+        from collections import defaultdict
+        detections_by_date = defaultdict(list)
+        for detection in detections:
+            date_key = detection.detected_at.date()
+            detections_by_date[date_key].append(detection)
         
         result = []
         
         for i in range(days):
             date = (timezone.now() - timedelta(days=days - 1 - i)).date()
             
-            # Get detections for this date
-            day_detections = detections.filter(detected_at__date=date)
+            # Get detections for this date from grouped data
+            day_detections = detections_by_date.get(date, [])
             
-            if day_detections.exists():
-                avg_valence = day_detections.aggregate(avg=Avg('valence'))['avg'] or 0
-                avg_arousal = day_detections.aggregate(avg=Avg('arousal'))['avg'] or 0
+            if day_detections:
+                avg_valence = sum(d.valence for d in day_detections) / len(day_detections)
+                avg_arousal = sum(d.arousal for d in day_detections) / len(day_detections)
                 
                 # Convert from -1 to 1 range to 0-10 range
                 valence_0_10 = ((avg_valence + 1) / 2) * 10

@@ -19,10 +19,10 @@ class User(AbstractUser):
     
     # Mental health profile
     mental_health_concerns = models.JSONField(default=list, blank=True)
-    journaling_goals = models.JSONField(default=list, blank=True)
+    mood_tracking_goals = models.JSONField(default=list, blank=True)
     
     # Preferences
-    preferred_journal_time = models.CharField(max_length=20, blank=True)
+    preferred_checkin_time = models.CharField(max_length=20, blank=True)
     enable_biometric = models.BooleanField(default=False)
     enable_notifications = models.BooleanField(default=True)
     

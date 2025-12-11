@@ -20,9 +20,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isMounted, setIsMounted] = useState(false)
+
+  // Ensure we're mounted before accessing localStorage
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   // Load user from existing tokens on first mount
   useEffect(() => {
+    if (!isMounted) return
+    
     const loadUserFromToken = async () => {
       try {
         const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
@@ -48,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     loadUserFromToken()
-  }, [])
+  }, [isMounted])
 
   const login = async (email: string, password: string): Promise<User> => {
     const data = await apiLogin(email, password)

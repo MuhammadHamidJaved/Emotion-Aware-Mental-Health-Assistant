@@ -272,8 +272,8 @@ export default function NewCheckInPage() {
         throw new Error('Authentication required. Please log in again.')
       }
       
-      // Call Django backend which will call the microservice
-      const response = await fetch('http://localhost:8000/api/journal/emotion/detect/', {
+      // Call Django backend which will call the 7-class emotion microservice
+      const response = await fetch('http://localhost:8000/api/journal/emotion/detect/7class/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -289,7 +289,13 @@ export default function NewCheckInPage() {
           throw new Error('Authentication required. Please log in again.')
         }
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || errorData.message || 'Failed to detect emotion')
+        const errorMessage = errorData.error || errorData.message || errorData.details || 'Failed to detect emotion. Please ensure the 7-class emotion microservice is running on port 5002.'
+        console.error('Emotion detection API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData
+        })
+        throw new Error(errorMessage)
       }
       
       const data = await response.json()
@@ -973,7 +979,7 @@ export default function NewCheckInPage() {
                 className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium flex items-center justify-center gap-2"
               >
                 <Sparkles className="w-5 h-5" />
-                View Personalized Recommendations
+                View Recommendations
               </button>
               <button 
                 onClick={handleBackToDashboard}

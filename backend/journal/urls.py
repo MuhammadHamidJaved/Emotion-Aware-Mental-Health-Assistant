@@ -12,6 +12,7 @@ urlpatterns = [
     path('journal/entries/', views.entries_list_or_create, name='journal-entries-list-create'),
     path('journal/entries/<int:entry_id>/', views.entry_detail_update_delete, name='journal-entry-detail-update-delete'),
     path('journal/emotion/detect/', views.detect_emotion_from_image, name='journal-emotion-detect'),
+    path('journal/emotion/detect/7class/', views.detect_emotion_from_image_7class, name='journal-emotion-detect-7class'),
     path('journal/emotion/detect/text/', views.detect_emotion_from_text, name='journal-emotion-detect-text'),
     
     # Dashboard endpoints

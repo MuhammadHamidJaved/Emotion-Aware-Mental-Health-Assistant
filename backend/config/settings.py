@@ -215,6 +215,8 @@ AUTH_USER_MODEL = 'users.User'
 
 # Emotion Detection Microservice Settings
 EMOTION_MICROSERVICE_URL = config('EMOTION_MICROSERVICE_URL', default='http://localhost:8001')
+# 7-Class Emotion Detection Microservice (new service with better accuracy)
+EMOTION_7CLASS_MICROSERVICE_URL = config('EMOTION_7CLASS_MICROSERVICE_URL', default='http://localhost:5002')
 
 # Recommendation Microservice Settings
 RECOMMENDATION_MICROSERVICE_URL = config('RECOMMENDATION_MICROSERVICE_URL', default='http://localhost:5000/api')

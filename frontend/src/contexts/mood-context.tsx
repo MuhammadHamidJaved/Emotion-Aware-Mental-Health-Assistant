@@ -24,10 +24,16 @@ const STORAGE_KEY = 'emotionAI:mood';
 
 export function MoodProvider({ children }: { children: React.ReactNode }) {
   const [mood, setMoodState] = useState<Mood>('neutral');
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Ensure we're mounted before accessing localStorage
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Load initial mood from localStorage
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (!isMounted || typeof window === 'undefined') return;
     const stored = window.localStorage.getItem(STORAGE_KEY) as Mood | null;
     if (stored) {
       setMoodState(stored);
@@ -35,7 +41,7 @@ export function MoodProvider({ children }: { children: React.ReactNode }) {
     } else {
       document.documentElement.setAttribute('data-mood', 'neutral');
     }
-  }, []);
+  }, [isMounted]);
 
   // Update HTML data attribute + persist
   const setMood = (m: Mood) => {

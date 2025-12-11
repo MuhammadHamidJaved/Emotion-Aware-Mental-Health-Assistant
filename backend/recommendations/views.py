@@ -43,15 +43,16 @@ def send_message(request):
     print("-" * 80)
     
     try:
-        # Save user message to database
+        # Save user message to database with encryption
         user_chat_message = AIChatMessage.objects.create(
             user=request.user,
             sender='user',
-            message=user_message,
             entry_reference_id=entry_reference_id,
-            emotion_context=emotion_context
         )
-        print("✅ User message saved to database")
+        user_chat_message.set_message(user_message)
+        user_chat_message.set_emotion_context(emotion_context)
+        user_chat_message.save()
+        print("✅ User message saved to database (encrypted)")
         
         # Get bot instance and generate response
         print("🔄 Initializing RAG bot instance...")
@@ -60,19 +61,21 @@ def send_message(request):
         bot_response = bot.get_response(user_message)
         print(f"✅ RAG response generated: {bot_response.get('answer', '')[:100]}...")
         
-        # Save AI response to database
+        # Save AI response to database with encryption
         ai_chat_message = AIChatMessage.objects.create(
             user=request.user,
             sender='ai',
-            message=bot_response.get('answer', ''),
             entry_reference_id=entry_reference_id,
-            emotion_context={
-                **emotion_context,
-                'sources': bot_response.get('sources', []),
-                'error': bot_response.get('error')
-            }
         )
-        print("✅ AI response saved to database")
+        ai_chat_message.set_message(bot_response.get('answer', ''))
+        ai_emotion_context = {
+            **emotion_context,
+            'sources': bot_response.get('sources', []),
+            'error': bot_response.get('error')
+        }
+        ai_chat_message.set_emotion_context(ai_emotion_context)
+        ai_chat_message.save()
+        print("✅ AI response saved to database (encrypted)")
         
         # Return response
         response_serializer = ChatResponseSerializer({
@@ -109,23 +112,25 @@ def send_message(request):
         traceback.print_exc()
         print("="*80 + "\n")
         
-        # Try to save error message
+        # Try to save error message with encryption
         try:
-            AIChatMessage.objects.create(
+            user_msg = AIChatMessage.objects.create(
                 user=request.user,
                 sender='user',
-                message=user_message,
                 entry_reference_id=entry_reference_id,
-                emotion_context=emotion_context
             )
+            user_msg.set_message(user_message)
+            user_msg.set_emotion_context(emotion_context)
+            user_msg.save()
             
-            AIChatMessage.objects.create(
+            ai_msg = AIChatMessage.objects.create(
                 user=request.user,
                 sender='ai',
-                message=f"I'm sorry, I encountered an error: {error_message}",
                 entry_reference_id=entry_reference_id,
-                emotion_context={'error': error_message}
             )
+            ai_msg.set_message(f"I'm sorry, I encountered an error: {error_message}")
+            ai_msg.set_emotion_context({'error': error_message})
+            ai_msg.save()
         except:
             pass
         

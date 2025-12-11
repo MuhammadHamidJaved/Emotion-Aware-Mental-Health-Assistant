@@ -6,14 +6,24 @@ from .models import AIChatMessage, Notification, Recommendation, UserRecommendat
 
 
 class ChatMessageSerializer(serializers.ModelSerializer):
-    """Serializer for AI chat messages"""
+    """Serializer for AI chat messages with encryption support"""
     
     entry_reference = serializers.IntegerField(source='entry_reference_id', read_only=True, allow_null=True)
+    message = serializers.SerializerMethodField()
+    emotion_context = serializers.SerializerMethodField()
     
     class Meta:
         model = AIChatMessage
         fields = ['id', 'sender', 'message', 'entry_reference', 'emotion_context', 'created_at']
         read_only_fields = ['id', 'created_at']
+    
+    def get_message(self, obj):
+        """Get decrypted message"""
+        return obj.get_message()
+    
+    def get_emotion_context(self, obj):
+        """Get decrypted emotion context"""
+        return obj.get_emotion_context()
 
 
 class ChatMessageCreateSerializer(serializers.Serializer):
@@ -31,7 +41,11 @@ class ChatResponseSerializer(serializers.Serializer):
 
 
 class NotificationSerializer(serializers.ModelSerializer):
-    """Serializer for Notification model"""
+    """Serializer for Notification model with encryption support"""
+    
+    title = serializers.SerializerMethodField()
+    message = serializers.SerializerMethodField()
+    metadata = serializers.SerializerMethodField()
     
     class Meta:
         model = Notification
@@ -49,15 +63,38 @@ class NotificationSerializer(serializers.ModelSerializer):
             'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'read_at']
+    
+    def get_title(self, obj):
+        """Get decrypted title"""
+        return obj.get_title()
+    
+    def get_message(self, obj):
+        """Get decrypted message"""
+        return obj.get_message()
+    
+    def get_metadata(self, obj):
+        """Get decrypted metadata"""
+        return obj.get_metadata()
 
 
 class RecommendationSerializer(serializers.ModelSerializer):
-    """Serializer for Recommendation model"""
+    """Serializer for Recommendation model with encryption support"""
+    
+    title = serializers.SerializerMethodField()
+    description = serializers.SerializerMethodField()
     
     class Meta:
         model = Recommendation
         fields = ['id', 'title', 'description', 'category', 'icon', 'created_at']
         read_only_fields = ['id', 'created_at']
+    
+    def get_title(self, obj):
+        """Get decrypted title"""
+        return obj.get_title()
+    
+    def get_description(self, obj):
+        """Get decrypted description"""
+        return obj.get_description()
 
 
 class UserRecommendationSerializer(serializers.ModelSerializer):

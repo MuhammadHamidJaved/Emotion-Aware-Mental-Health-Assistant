@@ -3,12 +3,14 @@ API views for journal entries
 """
 import logging
 import requests
+import cloudinary.uploader
 from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from .models import JournalEntry, EntryTag, EntryTagRelation
 from .serializers import JournalEntrySerializer, JournalEntryCreateSerializer
@@ -22,6 +24,13 @@ except ImportError:
     logger.warning("NotificationService not available")
     NotificationService = None
 
+# Import recommendation storage service
+try:
+    from recommendations.recommendation_service import RecommendationStorageService
+except ImportError:
+    logger.warning("RecommendationStorageService not available")
+    RecommendationStorageService = None
+
 # Import EmotionDetection model
 try:
     from emotions.models import EmotionDetection
@@ -31,6 +40,7 @@ except ImportError:
 
 # Microservice base URLs - can be configured in settings
 EMOTION_MICROSERVICE_URL = getattr(settings, 'EMOTION_MICROSERVICE_URL', 'http://localhost:8001')
+EMOTION_7CLASS_MICROSERVICE_URL = getattr(settings, 'EMOTION_7CLASS_MICROSERVICE_URL', 'http://localhost:5002')
 RECOMMENDATION_MICROSERVICE_URL = getattr(settings, 'RECOMMENDATION_MICROSERVICE_URL', 'http://localhost:5000/api')
 TEXT_EMOTION_MICROSERVICE_URL = getattr(settings, 'TEXT_EMOTION_MICROSERVICE_URL', 'http://localhost:5001')
 
@@ -72,6 +82,93 @@ def call_emotion_microservice(image_data_base64: str) -> dict:
         return None
     except Exception as e:
         logger.error(f"Unexpected error in emotion microservice call: {str(e)}")
+        return None
+
+
+def call_emotion_7class_microservice(image_data_base64: str) -> dict:
+    """
+    Call the 7-class emotion detection microservice (new service with better accuracy)
+    This service detects 7 emotions: angry, disgust, fear, happy, neutral, sad, surprise
+    
+    Args:
+        image_data_base64: Base64 encoded image string (with or without data URI prefix)
+        
+    Returns:
+        dict with emotion prediction results or None if error
+    """
+    try:
+        url = f"{EMOTION_7CLASS_MICROSERVICE_URL}/predict/base64"
+        
+        # Ensure image_data_base64 has the data URI prefix if not already present
+        if not image_data_base64.startswith('data:image'):
+            image_data_base64 = f'data:image/jpeg;base64,{image_data_base64}'
+        
+        payload = {
+            "image": image_data_base64,  # New service uses "image" instead of "image_data"
+            "model_type": "custom_cnn"  # Optional: specify model type
+        }
+        
+        response = requests.post(url, json=payload, timeout=10)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        # New microservice returns faces array, not a direct success field
+        if data.get('num_faces', 0) > 0 and data.get('faces'):
+            # Get the first face (primary detection)
+            first_face = data['faces'][0]
+            
+            # Extract emotion and confidence
+            predicted_emotion = first_face.get('emotion', 'neutral')
+            confidence = first_face.get('confidence', 0.0)
+            all_emotions = first_face.get('all_emotions', {})
+            
+            # Map all_emotions to all_scores for consistency (normalize to lowercase)
+            all_scores = {}
+            for emotion, score in all_emotions.items():
+                all_scores[emotion.lower()] = float(score)
+            
+            # Get top 3 emotions for display
+            top_3 = sorted(
+                all_scores.items(),
+                key=lambda x: x[1],
+                reverse=True
+            )[:3]
+            top_3 = [{'emotion': emo, 'confidence': conf} for emo, conf in top_3]
+            
+            return {
+                'predicted_emotion': predicted_emotion.lower(),  # Normalize to lowercase
+                'confidence': confidence,
+                'all_scores': all_scores,
+                'top_3': top_3,
+                'processing_time_ms': data.get('processing_time_ms', 0),
+                'num_faces': data.get('num_faces', 0)
+            }
+        else:
+            # No faces detected
+            logger.warning("No faces detected in image by 7-class microservice")
+            return {
+                'predicted_emotion': 'neutral',
+                'confidence': 0.0,
+                'all_scores': {'neutral': 1.0},
+                'top_3': [{'emotion': 'neutral', 'confidence': 1.0}],
+                'processing_time_ms': data.get('processing_time_ms', 0),
+                'num_faces': 0
+            }
+            
+    except requests.exceptions.ConnectionError as e:
+        logger.error(f"Connection error calling 7-class emotion microservice at {EMOTION_7CLASS_MICROSERVICE_URL}: {str(e)}")
+        logger.error("Make sure the 7-class emotion microservice is running on port 5002")
+        return None
+    except requests.exceptions.Timeout as e:
+        logger.error(f"Timeout calling 7-class emotion microservice: {str(e)}")
+        return None
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Request error calling 7-class emotion microservice: {str(e)}")
+        logger.error(f"Response status: {getattr(e.response, 'status_code', 'N/A') if hasattr(e, 'response') else 'N/A'}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error in 7-class emotion microservice call: {str(e)}", exc_info=True)
         return None
 
 
@@ -296,7 +393,17 @@ def detect_emotion_from_image(request):
         
         # Store recommendations and create notification if available
         if recommendations_data and NotificationService:
-            try:
+            try:                # Store recommendations in database
+                if RecommendationStorageService:
+                    user_recommendation = RecommendationStorageService.store_recommendations_from_microservice(
+                        user=request.user,
+                        emotion=mapped_emotion,
+                        recommendations_data=recommendations_data
+                    )
+                    if user_recommendation:
+                        logger.info(f"Stored recommendation for user {request.user.id}")
+                
+
                 # Create notification for recommendations
                 if NotificationService.should_send_notification(request.user, 'recommendation'):
                     recommendation_text = "Based on your detected emotion, we have personalized recommendations for you!"
@@ -326,8 +433,146 @@ def detect_emotion_from_image(request):
     }
     
     # Add recommendations if available
-    if recommendations_data:
+    if recommendations_data and isinstance(recommendations_data, dict):
         response_data['recommendations'] = recommendations_data.get('recommendations', {})
+    else:
+        # Include empty recommendations object so frontend doesn't break
+        response_data['recommendations'] = {}
+        logger.warning(f"Recommendations not available for emotion {predicted_emotion}. Recommendation microservice may be unavailable.")
+    
+    return Response(response_data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def detect_emotion_from_image_7class(request):
+    """
+    Detect emotion from an image (base64) using the 7-class emotion microservice
+    This uses the new microservice with better accuracy (7 emotions: angry, disgust, fear, happy, neutral, sad, surprise)
+    POST /api/journal/emotion/detect/7class/
+    
+    Body: {
+        "image_data": "base64_encoded_image_string"
+    }
+    """
+    image_data = request.data.get('image_data')
+    
+    if not image_data:
+        return Response(
+            {'error': 'image_data is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Call 7-class emotion detection microservice
+    result = call_emotion_7class_microservice(image_data)
+    
+    if result is None:
+        logger.error(f"7-class emotion detection failed for user {request.user.id}")
+        return Response(
+            {
+                'error': 'Failed to detect emotion. Please ensure the 7-class emotion microservice is running on port 5002.',
+                'details': 'The emotion detection service may be unavailable or there was an error processing the image.'
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
+    predicted_emotion = result['predicted_emotion']
+    
+    # Get recommendations based on detected emotion
+    recommendations_data = None
+    try:
+        # Map 7-class emotions to recommendation microservice format (happy, sad, angry, anxious, calm, neutral)
+        # The 7-class model returns: angry, disgust, fear, happy, neutral, sad, surprise
+        emotion_mapping = {
+            'happy': 'happy',
+            'sad': 'sad',
+            'angry': 'angry',
+            'disgust': 'angry',  # Map disgust to angry for recommendations
+            'fear': 'anxious',   # Map fear to anxious for recommendations
+            'neutral': 'neutral',
+            'surprise': 'happy',  # Map surprise to happy for recommendations
+            # Also handle any variations
+            'surprised': 'happy',
+            'fearful': 'anxious',
+            'disgusted': 'angry'
+        }
+        
+        mapped_emotion = emotion_mapping.get(predicted_emotion.lower(), 'neutral')
+        
+        # Get time of day for context
+        from datetime import datetime
+        current_hour = datetime.now().hour
+        if 5 <= current_hour < 12:
+            time_of_day = 'morning'
+        elif 12 <= current_hour < 17:
+            time_of_day = 'afternoon'
+        elif 17 <= current_hour < 21:
+            time_of_day = 'evening'
+        else:
+            time_of_day = 'night'
+        
+        context = {
+            'time_of_day': time_of_day,
+            'confidence': result['confidence'],
+            'detection_method': 'facial_recognition_7class'
+        }
+        
+        recommendations_data = call_recommendation_microservice(
+            user_id=str(request.user.id),
+            emotion=mapped_emotion,
+            context=context
+        )
+        
+        # Store recommendations and create notification if available
+        if recommendations_data and NotificationService:
+            try:                # Store recommendations in database
+                if RecommendationStorageService:
+                    user_recommendation = RecommendationStorageService.store_recommendations_from_microservice(
+                        user=request.user,
+                        emotion=mapped_emotion,
+                        recommendations_data=recommendations_data
+                    )
+                    if user_recommendation:
+                        logger.info(f"Stored recommendation for user {request.user.id}")
+                
+
+                # Create notification for recommendations
+                if NotificationService.should_send_notification(request.user, 'recommendation'):
+                    recommendation_text = "Based on your detected emotion, we have personalized recommendations for you!"
+                    if recommendations_data.get('recommendations', {}).get('quote'):
+                        recommendation_text += f" \"{recommendations_data['recommendations']['quote'][:100]}...\""
+                    
+                    NotificationService.create_recommendation_notification(
+                        user=request.user,
+                        recommendation_title=f"Recommendations for {predicted_emotion} mood",
+                        recommendation_id=None
+                    )
+            except Exception as e:
+                logger.error(f"Error creating recommendation notification: {e}")
+                
+    except Exception as e:
+        logger.error(f"Error fetching recommendations: {e}")
+        # Don't fail the emotion detection if recommendations fail
+    
+    # Build response
+    response_data = {
+        'success': True,
+        'predicted_emotion': predicted_emotion,
+        'confidence': result['confidence'],
+        'all_scores': result['all_scores'],
+        'top_3': result['top_3'],
+        'processing_time_ms': result['processing_time_ms'],
+        'num_faces': result.get('num_faces', 0),
+        'model_type': '7class'  # Indicate this is from the 7-class model
+    }
+    
+    # Add recommendations if available
+    if recommendations_data and isinstance(recommendations_data, dict):
+        response_data['recommendations'] = recommendations_data.get('recommendations', {})
+    else:
+        # Include empty recommendations object so frontend doesn't break
+        response_data['recommendations'] = {}
+        logger.warning(f"Recommendations not available for emotion {predicted_emotion}. Recommendation microservice may be unavailable.")
     
     return Response(response_data, status=status.HTTP_200_OK)
 
@@ -421,7 +666,17 @@ def detect_emotion_from_text(request):
         
         # Store recommendations and create notification if available
         if recommendations_data and NotificationService:
-            try:
+            try:                # Store recommendations in database
+                if RecommendationStorageService:
+                    user_recommendation = RecommendationStorageService.store_recommendations_from_microservice(
+                        user=request.user,
+                        emotion=mapped_emotion,
+                        recommendations_data=recommendations_data
+                    )
+                    if user_recommendation:
+                        logger.info(f"Stored recommendation for user {request.user.id}")
+                
+
                 # Create notification for recommendations
                 if NotificationService.should_send_notification(request.user, 'recommendation'):
                     recommendation_text = "Based on your detected emotion, we have personalized recommendations for you!"
@@ -452,19 +707,24 @@ def detect_emotion_from_text(request):
     }
     
     # Add recommendations if available
-    if recommendations_data:
+    if recommendations_data and isinstance(recommendations_data, dict):
         response_data['recommendations'] = recommendations_data.get('recommendations', {})
+    else:
+        # Include empty recommendations object so frontend doesn't break
+        response_data['recommendations'] = {}
+        logger.warning(f"Recommendations not available for emotion {predicted_emotion}. Recommendation microservice may be unavailable.")
     
     return Response(response_data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
 def entries_list_or_create(request):
     """
     List all journal entries or create a new one
     GET /api/journal/entries/ - List entries
-    POST /api/journal/entries/ - Create entry
+    POST /api/journal/entries/ - Create entry (supports multipart/form-data for file uploads)
     """
     if request.method == 'GET':
         entries = JournalEntry.objects.filter(user=request.user).order_by('-entry_date')
@@ -498,13 +758,10 @@ def entries_list_or_create(request):
         if emotion:
             emotion = emotion.lower().strip()
         
-        # Create journal entry
+        # Create journal entry with encryption
         entry = JournalEntry.objects.create(
             user=request.user,
             entry_type=validated_data['entry_type'],
-            title=validated_data.get('title', ''),
-            text_content=validated_data.get('text_content', ''),
-            transcription=validated_data.get('transcription', ''),
             emotion=emotion,
             emotion_confidence=validated_data.get('emotion_confidence'),
             word_count=word_count,
@@ -513,6 +770,48 @@ def entries_list_or_create(request):
             is_draft=validated_data.get('is_draft', False),
             entry_date=validated_data.get('entry_date', timezone.now())
         )
+        
+        # Set encrypted fields using helper methods
+        entry.set_title(validated_data.get('title', ''))
+        entry.set_text_content(validated_data.get('text_content', ''))
+        entry.set_transcription(validated_data.get('transcription', ''))
+        
+        # Handle media file uploads
+        voice_file = validated_data.get('voice_file')
+        video_file = validated_data.get('video_file')
+        
+        try:
+            # Upload voice file to Cloudinary if provided
+            if voice_file and entry.entry_type == 'voice':
+                upload_result = cloudinary.uploader.upload(
+                    voice_file,
+                    resource_type='auto',
+                    folder=f'journal/voice/{request.user.id}',
+                    public_id=f'voice_{entry.id}_{timezone.now().timestamp()}'
+                )
+                entry.voice_file = upload_result['secure_url']
+                logger.info(f"Voice file uploaded to Cloudinary: {upload_result['secure_url']}")
+            
+            # Upload video file to Cloudinary if provided
+            if video_file and entry.entry_type == 'video':
+                upload_result = cloudinary.uploader.upload(
+                    video_file,
+                    resource_type='video',
+                    folder=f'journal/video/{request.user.id}',
+                    public_id=f'video_{entry.id}_{timezone.now().timestamp()}'
+                )
+                entry.video_file = upload_result['secure_url']
+                logger.info(f"Video file uploaded to Cloudinary: {upload_result['secure_url']}")
+        
+        except Exception as e:
+            logger.error(f"Error uploading media to Cloudinary: {str(e)}")
+            entry.delete()
+            return Response(
+                {'error': f'Failed to upload media file: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+        entry.save()
         
         # Handle tags
         tags = validated_data.get('tags', [])
@@ -709,14 +1008,14 @@ def entry_detail_update_delete(request, entry_id):
         
         validated_data = serializer.validated_data
         
-        # Update fields
+        # Update fields with encryption
         if 'title' in validated_data:
-            entry.title = validated_data['title']
+            entry.set_title(validated_data['title'])
         if 'text_content' in validated_data:
-            entry.text_content = validated_data['text_content']
+            entry.set_text_content(validated_data['text_content'])
             entry.word_count = len(validated_data['text_content'].split())
         if 'transcription' in validated_data:
-            entry.transcription = validated_data['transcription']
+            entry.set_transcription(validated_data['transcription'])
         if 'emotion' in validated_data:
             entry.emotion = validated_data['emotion']
         if 'emotion_confidence' in validated_data:

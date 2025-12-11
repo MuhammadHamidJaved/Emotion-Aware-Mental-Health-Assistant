@@ -24,7 +24,10 @@ export default function PersonalizedRecommendationsPage() {
         const data = JSON.parse(stored);
         console.log('Loaded recommendations data:', data);
         console.log('Music data:', data.recommendations?.music);
-        setRecommendations(data.recommendations);
+        
+        // Ensure recommendations is an object, not null
+        const recommendations = data.recommendations || {};
+        setRecommendations(recommendations);
         setEmotionData({
           dominant: data.emotion,
           confidence: data.confidence,
@@ -32,7 +35,12 @@ export default function PersonalizedRecommendationsPage() {
         });
       } catch (e) {
         console.error('Error parsing stored recommendations:', e);
+        // Set empty recommendations on error
+        setRecommendations({});
       }
+    } else {
+      // No stored data, set empty recommendations
+      setRecommendations({});
     }
     setIsLoading(false);
   }, []);
