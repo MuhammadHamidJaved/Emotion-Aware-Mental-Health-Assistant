@@ -56,8 +56,18 @@ def dashboard_stats(request):
     )
     
     # Calculate streak by checking consecutive days
+    # Start from today, but if no entry today, start from yesterday (give user until end of day)
     check_date = current_date
-    while check_date in entry_dates:
+    if check_date not in entry_dates:
+        # No entry today, check if there's an entry yesterday
+        check_date = current_date - timedelta(days=1)
+        if check_date not in entry_dates:
+            # Streak is broken (no entry today or yesterday)
+            streak = 0
+            check_date = None
+    
+    # Count consecutive days backwards
+    while check_date and check_date in entry_dates:
         streak += 1
         check_date -= timedelta(days=1)
     
