@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { User as UserIcon, Bell, Lock, Palette, Download, Trash2, Save, Camera, Loader2 } from 'lucide-react';
+import { User as UserIcon, Bell, Lock, Palette, Sparkles, Download, Trash2, Save, Camera, Loader2, X, Plus } from 'lucide-react';
 import ProtectedPage from '@/components/ProtectedPage';
 import {
   apiGetProfileSettings,
@@ -12,12 +12,17 @@ import {
   apiUpdatePrivacySettings,
   apiGetAppearanceSettings,
   apiUpdateAppearanceSettings,
+  apiGetRecommendationSettings,
+  apiUpdateRecommendationSettings,
+  apiGetRecommendationOptions,
   apiExportData,
   apiDeleteAccount,
   type ProfileSettings,
   type NotificationSettings,
   type PrivacySettings,
   type AppearanceSettings,
+  type RecommendationSettings,
+  type RecommendationOptions,
 } from '@/lib/api';
 
 export default function SettingsPage() {
@@ -60,6 +65,19 @@ export default function SettingsPage() {
     color_scheme: 'default',
   });
 
+  // Recommendation Personalization Settings
+  const [recommendations, setRecommendations] = useState<RecommendationSettings>({
+    music_language: '',
+    music_genres: [],
+    favorite_artists: [],
+    market: 'US',
+    fitness_level: 'moderate',
+    age_group: null,
+    content_language: 'en',
+  });
+  const [recOptions, setRecOptions] = useState<RecommendationOptions | null>(null);
+  const [artistInput, setArtistInput] = useState('');
+
   // Load all settings on mount
   useEffect(() => {
     const loadSettings = async () => {
@@ -73,11 +91,13 @@ export default function SettingsPage() {
         }
 
         // Load all settings in parallel
-        const [profile, notificationsData, privacyData, appearanceData] = await Promise.allSettled([
+        const [profile, notificationsData, privacyData, appearanceData, recData, recOptionsData] = await Promise.allSettled([
           apiGetProfileSettings(accessToken),
           apiGetNotificationSettings(accessToken),
           apiGetPrivacySettings(accessToken),
           apiGetAppearanceSettings(accessToken),
+          apiGetRecommendationSettings(accessToken),
+          apiGetRecommendationOptions(accessToken),
         ]);
 
         if (profile.status === 'fulfilled') {
@@ -99,6 +119,14 @@ export default function SettingsPage() {
 
         if (appearanceData.status === 'fulfilled') {
           setTheme(appearanceData.value);
+        }
+
+        if (recData.status === 'fulfilled') {
+          setRecommendations(recData.value);
+        }
+
+        if (recOptionsData.status === 'fulfilled') {
+          setRecOptions(recOptionsData.value);
         }
       } catch (err) {
         console.error('Failed to load settings:', err);
@@ -147,6 +175,9 @@ export default function SettingsPage() {
       } else if (activeTab === 'appearance') {
         await apiUpdateAppearanceSettings(accessToken, theme);
         alert('Appearance settings updated successfully.');
+      } else if (activeTab === 'personalization') {
+        await apiUpdateRecommendationSettings(accessToken, recommendations);
+        alert('Personalization settings updated successfully.');
       }
     } catch (error: any) {
       setError(error.message || 'Failed to save settings. Please try again.');
@@ -189,6 +220,7 @@ export default function SettingsPage() {
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'privacy', label: 'Privacy & Data', icon: Lock },
     { id: 'appearance', label: 'Appearance', icon: Palette },
+    { id: 'personalization', label: 'Personalization', icon: Sparkles },
   ];
 
   return (
@@ -618,6 +650,227 @@ export default function SettingsPage() {
                         Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
                       </div>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Personalization Tab */}
+              {activeTab === 'personalization' && (
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-xl font-bold mb-4">Recommendation Personalization</h2>
+                    <p className="text-sm text-gray-600 mb-6">
+                      Customize your music, exercise, and content recommendations to match your preferences
+                    </p>
+                  </div>
+
+                  {/* Music Language */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Music Language
+                    </label>
+                    <select
+                      value={recommendations.music_language}
+                      onChange={(e) => setRecommendations({ ...recommendations, music_language: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none bg-white"
+                    >
+                      {recOptions?.music_languages?.map((lang) => (
+                        <option key={lang.value} value={lang.value}>
+                          {lang.label}
+                        </option>
+                      )) || <option value="">Any Language</option>}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">Songs will be biased towards this language</p>
+                  </div>
+
+                  {/* Favorite Artists */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Favorite Artists (up to 3)
+                    </label>
+                    <div className="space-y-2">
+                      {recommendations.favorite_artists.map((artist, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <span className="flex-1 px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm">
+                            {artist}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = recommendations.favorite_artists.filter((_, i) => i !== index);
+                              setRecommendations({ ...recommendations, favorite_artists: updated });
+                            }}
+                            className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                      {recommendations.favorite_artists.length < 3 && (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={artistInput}
+                            onChange={(e) => setArtistInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && artistInput.trim()) {
+                                e.preventDefault();
+                                setRecommendations({
+                                  ...recommendations,
+                                  favorite_artists: [...recommendations.favorite_artists, artistInput.trim()],
+                                });
+                                setArtistInput('');
+                              }
+                            }}
+                            placeholder="Type artist name and press Enter"
+                            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none text-sm"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (artistInput.trim()) {
+                                setRecommendations({
+                                  ...recommendations,
+                                  favorite_artists: [...recommendations.favorite_artists, artistInput.trim()],
+                                });
+                                setArtistInput('');
+                              }
+                            }}
+                            className="p-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">~70% of music results will be from these artists</p>
+                  </div>
+
+                  {/* Music Genres */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Preferred Music Genres
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {(recOptions?.genres || []).map((genre) => {
+                        const isSelected = recommendations.music_genres.includes(genre);
+                        return (
+                          <button
+                            key={genre}
+                            type="button"
+                            onClick={() => {
+                              const updated = isSelected
+                                ? recommendations.music_genres.filter((g) => g !== genre)
+                                : [...recommendations.music_genres, genre];
+                              setRecommendations({ ...recommendations, music_genres: updated });
+                            }}
+                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                              isSelected
+                                ? 'bg-black text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            {genre}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Select genres to personalize mood-based music</p>
+                  </div>
+
+                  {/* Spotify Market */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Spotify Market (Region)
+                    </label>
+                    <select
+                      value={recommendations.market}
+                      onChange={(e) => setRecommendations({ ...recommendations, market: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none bg-white"
+                    >
+                      {recOptions?.markets?.map((m) => (
+                        <option key={m.code} value={m.code}>
+                          {m.name} ({m.code})
+                        </option>
+                      )) || <option value="US">United States (US)</option>}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">Affects which tracks are available in the Spotify catalog</p>
+                  </div>
+
+                  {/* Fitness Level */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Fitness Level
+                    </label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {(['beginner', 'moderate', 'advanced'] as const).map((level) => (
+                        <button
+                          key={level}
+                          type="button"
+                          onClick={() => setRecommendations({ ...recommendations, fitness_level: level })}
+                          className={`p-3 border-2 rounded-lg capitalize transition-colors text-sm font-medium ${
+                            recommendations.fitness_level === level
+                              ? 'border-black bg-gray-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          {level}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Adjusts exercise difficulty in recommendations</p>
+                  </div>
+
+                  {/* Age Group */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Age Group
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {(recOptions?.age_groups || [
+                        { value: 'teen', label: 'Teen (13-17)' },
+                        { value: 'young_adult', label: 'Young Adult (18-25)' },
+                        { value: 'adult', label: 'Adult (26-59)' },
+                        { value: 'senior', label: 'Senior (60+)' },
+                      ]).map((ag) => (
+                        <button
+                          key={ag.value}
+                          type="button"
+                          onClick={() =>
+                            setRecommendations({
+                              ...recommendations,
+                              age_group: recommendations.age_group === ag.value ? null : ag.value,
+                            })
+                          }
+                          className={`p-3 border-2 rounded-lg transition-colors text-sm font-medium text-left ${
+                            recommendations.age_group === ag.value
+                              ? 'border-black bg-gray-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          {ag.label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Optional -- helps tailor content recommendations</p>
+                  </div>
+
+                  {/* Content Language */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Content Language (Quotes & Text)
+                    </label>
+                    <select
+                      value={recommendations.content_language}
+                      onChange={(e) => setRecommendations({ ...recommendations, content_language: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent outline-none bg-white"
+                    >
+                      <option value="en">English</option>
+                      <option value="ur">Urdu</option>
+                      <option value="hi">Hindi</option>
+                      <option value="ar">Arabic</option>
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">Language for quotes and text-based recommendations</p>
                   </div>
                 </div>
               )}

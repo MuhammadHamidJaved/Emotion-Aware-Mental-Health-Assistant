@@ -165,18 +165,16 @@ export default function CheckInDetailPage() {
 
   if (!entry) {
     return (
-      <div className="min-h-screen bg-white text-black p-6">
-        <div className="max-w-4xl mx-auto text-center py-20">
-          <h1 className="text-2xl font-bold mb-4">Check-In Not Found</h1>
-          <p className="text-gray-600 mb-6">The check-in you're looking for doesn't exist.</p>
-          <Link 
-            href="/check-in"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Check-In History
-          </Link>
-        </div>
+      <div className="text-center py-20">
+        <h1 className="text-2xl font-bold mb-4">Check-In Not Found</h1>
+        <p className="text-gray-500 mb-6">The check-in you're looking for doesn't exist.</p>
+        <Link
+          href="/check-in"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Check-In History
+        </Link>
       </div>
     );
   }
@@ -191,32 +189,31 @@ export default function CheckInDetailPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-black p-6">
-      <div className="max-w-5xl mx-auto">
+    <div className="space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <Link 
+        <div className="bg-white border-b border-gray-200 -mx-4 sm:-mx-6 px-4 sm:px-6 py-4 flex items-center justify-between">
+          <Link
             href="/check-in"
-            className="flex items-center gap-2 text-gray-600 hover:text-black transition-colors"
+            className="flex items-center gap-2 text-gray-500 hover:text-black transition-colors text-sm"
           >
             <ArrowLeft className="w-5 h-5" />
             <span className="text-sm">Back to Check-In History</span>
           </Link>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Link
               href={`/check-in/${entryId}/edit`}
-              className="flex items-center gap-2 px-4 py-2 border border-black rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              <Edit className="w-4 h-4" />
-              <span className="text-sm font-medium">Edit</span>
+              <Edit className="w-3.5 h-3.5" />
+              Edit
             </Link>
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="flex items-center gap-2 px-4 py-2 border border-red-500 text-red-500 rounded-lg hover:bg-red-50 transition-colors"
+              className="flex items-center gap-2 px-3 py-1.5 text-sm border border-red-200 text-red-500 rounded-lg hover:bg-red-50 transition-colors"
             >
-              <Trash2 className="w-4 h-4" />
-              <span className="text-sm font-medium">Delete</span>
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete
             </button>
           </div>
         </div>
@@ -225,7 +222,7 @@ export default function CheckInDetailPage() {
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Entry Header */}
-            <div className="border border-gray-200 rounded-lg p-6">
+            <div className="bg-white rounded-2xl border border-gray-200 p-6">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 flex items-center justify-center bg-gray-100 rounded-lg">
@@ -277,7 +274,7 @@ export default function CheckInDetailPage() {
             </div>
 
             {/* All Predictions */}
-            <div className="border border-gray-200 rounded-lg p-6">
+            <div className="bg-white rounded-2xl border border-gray-200 p-6">
               <h3 className="text-lg font-semibold mb-4">All Emotion Predictions</h3>
               <div className="space-y-3">
                 {entry.allPredictions.map((pred, idx) => (
@@ -308,7 +305,7 @@ export default function CheckInDetailPage() {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Dominant Emotion */}
-            <div className="border border-gray-200 rounded-lg p-6">
+            <div className="bg-white rounded-2xl border border-gray-200 p-5">
               <h3 className="text-sm font-medium text-gray-600 mb-4">Dominant Emotion</h3>
               <div 
                 className="p-6 rounded-lg mb-4"
@@ -353,7 +350,7 @@ export default function CheckInDetailPage() {
             </div>
 
             {/* Quick Stats */}
-            <div className="border border-gray-200 rounded-lg p-6">
+            <div className="bg-white rounded-2xl border border-gray-200 p-5">
               <h3 className="text-sm font-medium text-gray-600 mb-4">Quick Stats</h3>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
@@ -376,12 +373,11 @@ export default function CheckInDetailPage() {
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal */}}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6">
             <h3 className="text-xl font-bold mb-2">Delete Check-In?</h3>
             <p className="text-gray-600 mb-6">
               Are you sure you want to delete this check-in? This action cannot be undone.

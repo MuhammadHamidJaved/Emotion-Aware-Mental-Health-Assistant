@@ -524,7 +524,7 @@ export default function NewCheckInPage() {
 
   return (
     <>
-      <div className="min-h-screen bg-white">
+      <div className="bg-gray-50 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6">
         <header className="border-b border-neutral-200 bg-white sticky top-0 z-10">
           <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-4">

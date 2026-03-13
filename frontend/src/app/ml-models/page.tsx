@@ -39,21 +39,27 @@ export default function MLModelsPage() {
   const trainingData = getTrainingData(selectedModel.type)
 
   return (
-    <div className="min-h-screen bg-white p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">ML Models Dashboard</h1>
-          <p className="text-neutral-600">Monitor and manage emotion detection models</p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 -mx-4 sm:-mx-6 px-4 sm:px-6 py-4">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-purple-100 rounded-xl flex items-center justify-center">
+            <Brain className="w-5 h-5 text-purple-600" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-gray-900">ML Models Dashboard</h1>
+            <p className="text-xs text-gray-500">Monitor and manage emotion detection models</p>
+          </div>
         </div>
+      </div>
 
         {/* Model Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {ML_MODELS.map((model) => (
             <button
               key={model.id}
               onClick={() => setSelectedModel(model)}
-              className={`p-4 rounded-lg border-2 transition-all text-left ${
+              className={`p-4 rounded-xl border-2 transition-all text-left ${
                 selectedModel.id === model.id
                   ? 'border-black bg-neutral-50'
                   : 'border-neutral-200 hover:border-neutral-300'
@@ -80,11 +86,11 @@ export default function MLModelsPage() {
         </div>
 
         {/* Selected Model Details */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Performance Metrics */}
           <div className="lg:col-span-2 space-y-6">
             {/* Key Metrics */}
-            <div className="border border-neutral-200 rounded-lg p-6">
+            <div className="bg-white rounded-2xl border border-gray-200 p-6">
               <h2 className="text-xl font-bold mb-4">Performance Metrics</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="p-4 bg-neutral-50 rounded-lg">
@@ -107,7 +113,7 @@ export default function MLModelsPage() {
             </div>
 
             {/* Training History Chart */}
-            <div className="border border-neutral-200 rounded-lg p-6">
+            <div className="bg-white rounded-2xl border border-gray-200 p-6">
               <h2 className="text-xl font-bold mb-4">Training History</h2>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={trainingData}>
@@ -143,7 +149,7 @@ export default function MLModelsPage() {
             </div>
 
             {/* Confusion Matrix */}
-            <div className="border border-neutral-200 rounded-lg p-6">
+            <div className="bg-white rounded-2xl border border-gray-200 p-6">
               <h2 className="text-xl font-bold mb-4">Confusion Matrix</h2>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -188,7 +194,7 @@ export default function MLModelsPage() {
           {/* Model Info Sidebar */}
           <div className="space-y-6">
             {/* Model Details */}
-            <div className="border border-neutral-200 rounded-lg p-6">
+            <div className="bg-white rounded-2xl border border-gray-200 p-6">
               <h2 className="text-xl font-bold mb-4">Model Details</h2>
               <div className="space-y-4">
                 <div>
@@ -231,7 +237,7 @@ export default function MLModelsPage() {
             </div>
 
             {/* Actions */}
-            <div className="border border-neutral-200 rounded-lg p-6">
+            <div className="bg-white rounded-2xl border border-gray-200 p-6">
               <h2 className="text-xl font-bold mb-4">Actions</h2>
               <div className="space-y-3">
                 <button className="w-full py-2 px-4 bg-black text-white rounded-lg hover:bg-neutral-800 transition-colors text-sm font-medium">
@@ -250,7 +256,7 @@ export default function MLModelsPage() {
             </div>
 
             {/* Class Distribution */}
-            <div className="border border-neutral-200 rounded-lg p-6">
+            <div className="bg-white rounded-2xl border border-gray-200 p-6">
               <h2 className="text-xl font-bold mb-4">Class Distribution</h2>
               <div className="space-y-2">
                 {performance.classLabels.map((label, i) => {
@@ -277,7 +283,6 @@ export default function MLModelsPage() {
             </div>
           </div>
         </div>
-      </div>
     </div>
   )
 }

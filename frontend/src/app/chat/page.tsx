@@ -176,9 +176,14 @@ export default function ChatPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)]">
       {/* Page Header */}
-      <div className="border-b border-gray-200 p-4 bg-white">
-        <h1 className="text-2xl font-bold mb-1">AI Wellness Companion</h1>
-        <p className="text-sm text-gray-600">I'm here to provide emotional support. Share your feelings and I'll help you find ways to cope.</p>
+      <div className="border-b border-gray-200 px-4 sm:px-6 py-4 bg-white flex items-center gap-3">
+        <div className="w-8 h-8 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0">
+          <Bot className="w-4 h-4 text-indigo-600" />
+        </div>
+        <div>
+          <h1 className="text-base font-bold leading-none">AI Wellness Companion</h1>
+          <p className="text-xs text-gray-500 mt-0.5">Share your feelings — I'm here to listen and help.</p>
+        </div>
       </div>
 
       {/* Error Banner */}

@@ -1,12 +1,14 @@
 """
 Settings API endpoints with AES-256 encryption
 """
+import requests
+import logging
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
-import logging
+from django.conf import settings as django_settings
 
 logger = logging.getLogger(__name__)
 
@@ -302,5 +304,174 @@ def settings_delete_account(request):
     # For now, just mark as deleted or soft delete
     return Response({
         'message': 'Account deletion requested. You will receive a confirmation email.'
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def settings_recommendations(request):
+    """
+    Get or update recommendation personalization settings.
+    These preferences are sent to the recommendation microservice
+    to personalize music, exercises, quotes, and meditation suggestions.
+    
+    GET /api/settings/recommendations/
+    PATCH /api/settings/recommendations/
+    """
+    user = request.user
+    preferences, created = UserPreferences.objects.get_or_create(user=user)
+    
+    if request.method == 'GET':
+        saved = preferences.get_recommendation_settings()
+        default_settings = {
+            'music_language': '',
+            'music_genres': [],
+            'favorite_artists': [],
+            'market': 'US',
+            'fitness_level': 'moderate',
+            'age_group': None,
+            'content_language': 'en',
+        }
+        return Response({**default_settings, **saved}, status=status.HTTP_200_OK)
+    
+    elif request.method == 'PATCH':
+        try:
+            new_settings = request.data.copy()
+            
+            if 'favorite_artists' in new_settings:
+                artists = new_settings['favorite_artists']
+                if isinstance(artists, list) and len(artists) > 3:
+                    return Response(
+                        {'error': 'Maximum 3 favorite artists allowed.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            if 'fitness_level' in new_settings:
+                if new_settings['fitness_level'] not in ('beginner', 'moderate', 'advanced'):
+                    return Response(
+                        {'error': 'fitness_level must be beginner, moderate, or advanced.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            if 'age_group' in new_settings:
+                if new_settings['age_group'] not in (None, '', 'teen', 'young_adult', 'adult', 'senior'):
+                    return Response(
+                        {'error': 'Invalid age_group value.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            existing = preferences.get_recommendation_settings()
+            existing.update(new_settings)
+            preferences.set_recommendation_settings(existing)
+            preferences.save()
+            
+            return Response({
+                'message': 'Recommendation settings updated successfully',
+                'settings': existing
+            }, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            logger.error(f"Error updating recommendation settings: {e}")
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+RECOMMENDATION_MICROSERVICE_URL = getattr(
+    django_settings, 'RECOMMENDATION_MICROSERVICE_URL', 'http://localhost:5001/api'
+)
+
+MUSIC_LANGUAGES = [
+    {'value': '', 'label': 'Any Language'},
+    {'value': 'english', 'label': 'English'},
+    {'value': 'hindi', 'label': 'Hindi'},
+    {'value': 'urdu', 'label': 'Urdu'},
+    {'value': 'punjabi', 'label': 'Punjabi'},
+    {'value': 'arabic', 'label': 'Arabic'},
+    {'value': 'turkish', 'label': 'Turkish'},
+    {'value': 'korean', 'label': 'Korean'},
+    {'value': 'japanese', 'label': 'Japanese'},
+    {'value': 'spanish', 'label': 'Spanish'},
+    {'value': 'french', 'label': 'French'},
+    {'value': 'german', 'label': 'German'},
+    {'value': 'portuguese', 'label': 'Portuguese'},
+    {'value': 'bengali', 'label': 'Bengali'},
+    {'value': 'tamil', 'label': 'Tamil'},
+    {'value': 'telugu', 'label': 'Telugu'},
+    {'value': 'chinese', 'label': 'Chinese'},
+    {'value': 'italian', 'label': 'Italian'},
+    {'value': 'russian', 'label': 'Russian'},
+    {'value': 'thai', 'label': 'Thai'},
+    {'value': 'vietnamese', 'label': 'Vietnamese'},
+    {'value': 'malay', 'label': 'Malay'},
+    {'value': 'indonesian', 'label': 'Indonesian'},
+]
+
+MARKETS = [
+    {'code': 'US', 'name': 'United States'},
+    {'code': 'GB', 'name': 'United Kingdom'},
+    {'code': 'PK', 'name': 'Pakistan'},
+    {'code': 'IN', 'name': 'India'},
+    {'code': 'AE', 'name': 'United Arab Emirates'},
+    {'code': 'SA', 'name': 'Saudi Arabia'},
+    {'code': 'DE', 'name': 'Germany'},
+    {'code': 'FR', 'name': 'France'},
+    {'code': 'JP', 'name': 'Japan'},
+    {'code': 'KR', 'name': 'South Korea'},
+    {'code': 'AU', 'name': 'Australia'},
+    {'code': 'CA', 'name': 'Canada'},
+    {'code': 'TR', 'name': 'Turkey'},
+    {'code': 'BR', 'name': 'Brazil'},
+]
+
+FITNESS_LEVELS = ['beginner', 'moderate', 'advanced']
+
+AGE_GROUPS = [
+    {'value': 'teen', 'label': 'Teen (13-17)'},
+    {'value': 'young_adult', 'label': 'Young Adult (18-25)'},
+    {'value': 'adult', 'label': 'Adult (26-59)'},
+    {'value': 'senior', 'label': 'Senior (60+)'},
+]
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def meta_recommendation_options(request):
+    """
+    Return valid options for recommendation personalization fields.
+    Tries to fetch genres from the microservice; falls back to a hardcoded list.
+    
+    GET /api/settings/recommendations/options/
+    """
+    genres = [
+        'acoustic', 'afrobeat', 'alt-rock', 'alternative', 'ambient',
+        'blues', 'classical', 'chill', 'club', 'country',
+        'dance', 'deep-house', 'disco', 'drum-and-bass', 'edm',
+        'electronic', 'folk', 'funk', 'gospel', 'grunge',
+        'hip-hop', 'house', 'indie', 'indie-pop', 'jazz',
+        'k-pop', 'latin', 'lo-fi', 'metal', 'new-age',
+        'opera', 'piano', 'pop', 'punk', 'r-n-b',
+        'reggae', 'rock', 'romance', 'soul', 'study',
+        'techno', 'trance', 'world-music',
+    ]
+
+    try:
+        res = requests.get(f"{RECOMMENDATION_MICROSERVICE_URL}/meta/genres", timeout=5)
+        if res.ok:
+            data = res.json()
+            if isinstance(data, list):
+                genres = data
+            elif isinstance(data, dict) and 'genres' in data:
+                genres = data['genres']
+    except Exception as e:
+        logger.info(f"Could not fetch genres from microservice, using defaults: {e}")
+
+    return Response({
+        'music_languages': MUSIC_LANGUAGES,
+        'genres': sorted(genres),
+        'markets': MARKETS,
+        'fitness_levels': FITNESS_LEVELS,
+        'age_groups': AGE_GROUPS,
     }, status=status.HTTP_200_OK)
 

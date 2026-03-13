@@ -41,7 +41,7 @@ except ImportError:
 # Microservice base URLs - can be configured in settings
 EMOTION_MICROSERVICE_URL = getattr(settings, 'EMOTION_MICROSERVICE_URL', 'http://localhost:8001')
 EMOTION_7CLASS_MICROSERVICE_URL = getattr(settings, 'EMOTION_7CLASS_MICROSERVICE_URL', 'http://localhost:5002')
-RECOMMENDATION_MICROSERVICE_URL = getattr(settings, 'RECOMMENDATION_MICROSERVICE_URL', 'http://localhost:5000/api')
+RECOMMENDATION_MICROSERVICE_URL = getattr(settings, 'RECOMMENDATION_MICROSERVICE_URL', 'http://localhost:5001/api')
 TEXT_EMOTION_MICROSERVICE_URL = getattr(settings, 'TEXT_EMOTION_MICROSERVICE_URL', 'http://localhost:5001')
 
 
@@ -265,7 +265,19 @@ def call_text_emotion_microservice(text: str) -> dict:
         return None
 
 
-def call_recommendation_microservice(user_id: str, emotion: str, context: dict = None) -> dict:
+def get_user_recommendation_preferences(user) -> dict:
+    """Load saved recommendation personalization preferences for a user."""
+    try:
+        from users.settings_models import UserPreferences
+        prefs = UserPreferences.objects.filter(user=user).first()
+        if prefs:
+            return prefs.get_recommendation_settings()
+    except Exception as e:
+        logger.error(f"Error loading recommendation preferences: {e}")
+    return {}
+
+
+def call_recommendation_microservice(user_id: str, emotion: str, context: dict = None, preferences: dict = None) -> dict:
     """
     Call the recommendation microservice to get mood-based recommendations
     
@@ -273,6 +285,7 @@ def call_recommendation_microservice(user_id: str, emotion: str, context: dict =
         user_id: User identifier
         emotion: Detected emotion (happy, sad, angry, anxious, calm, neutral)
         context: Optional context dictionary (time_of_day, etc.)
+        preferences: Optional user personalization preferences (music_language, genres, etc.)
         
     Returns:
         dict with recommendations or None if error
@@ -282,6 +295,7 @@ def call_recommendation_microservice(user_id: str, emotion: str, context: dict =
         payload = {
             "user_id": str(user_id),
             "emotion": emotion.lower(),
+            "preferences": preferences or {},
             "context": context or {}
         }
         
@@ -385,10 +399,13 @@ def detect_emotion_from_image(request):
             'detection_method': 'facial_recognition'
         }
         
+        user_preferences = get_user_recommendation_preferences(request.user)
+        
         recommendations_data = call_recommendation_microservice(
             user_id=str(request.user.id),
             emotion=mapped_emotion,
-            context=context
+            context=context,
+            preferences=user_preferences
         )
         
         # Store recommendations and create notification if available
@@ -517,10 +534,13 @@ def detect_emotion_from_image_7class(request):
             'detection_method': 'facial_recognition_7class'
         }
         
+        user_preferences = get_user_recommendation_preferences(request.user)
+        
         recommendations_data = call_recommendation_microservice(
             user_id=str(request.user.id),
             emotion=mapped_emotion,
-            context=context
+            context=context,
+            preferences=user_preferences
         )
         
         # Store recommendations and create notification if available
@@ -658,10 +678,13 @@ def detect_emotion_from_text(request):
             'detection_method': 'text_analysis'
         }
         
+        user_preferences = get_user_recommendation_preferences(request.user)
+        
         recommendations_data = call_recommendation_microservice(
             user_id=str(request.user.id),
             emotion=mapped_emotion,
-            context=context
+            context=context,
+            preferences=user_preferences
         )
         
         # Store recommendations and create notification if available

@@ -7,9 +7,6 @@ import {
   Mail, Edit, Camera, Phone, Clock
 } from 'lucide-react';
 import Link from 'next/link';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/avatar';
 
 export default function ProfilePage() {
@@ -35,8 +32,7 @@ export default function ProfilePage() {
   return (
     <div className="space-y-4">
       {/* Hero Card - Compact */}
-      <Card className="border-0 bg-gradient-to-br from-black via-gray-900 to-gray-800 text-white">
-        <CardContent className="p-4">
+      <div className="rounded-2xl overflow-hidden bg-gradient-to-br from-black via-gray-900 to-gray-800 text-white p-4">
           <div className="flex items-start gap-4">
             {/* Avatar - Smaller */}
             <div 
@@ -66,10 +62,10 @@ export default function ProfilePage() {
                   <p className="text-gray-300 text-xs">@{user.email.split('@')[0]}</p>
                 </div>
                 <Link href="/profile/edit">
-                  <Button size="sm" variant="outline" className="h-7 text-xs bg-white/10 border-white/20 text-white hover:bg-white/20">
-                    <Edit className="w-3 h-3 mr-1" />
+                  <button className="h-7 text-xs px-2.5 py-1 bg-white/10 border border-white/20 text-white hover:bg-white/20 rounded-lg flex items-center gap-1 transition-colors">
+                    <Edit className="w-3 h-3" />
                     Edit
-                  </Button>
+                  </button>
                 </Link>
               </div>
               {user.bio && (
@@ -105,40 +101,31 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+      </div>
 
       {/* Stats - Compact */}
       <div className="grid grid-cols-4 gap-2">
-        <Card>
-          <CardContent className="p-3 text-center">
-            <div className="text-2xl font-bold text-indigo-600">{user.total_entries || 0}</div>
-            <p className="text-xs text-gray-600 mt-0.5">Entries</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3 text-center">
-            <div className="text-2xl font-bold text-orange-600 flex items-center justify-center gap-1">
-              <Flame className="w-5 h-5" />
-              {user.current_streak || 0}
-            </div>
-            <p className="text-xs text-gray-600 mt-0.5">Streak</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3 text-center">
-            <div className="text-2xl font-bold text-purple-600">{user.longest_streak || 0}</div>
-            <p className="text-xs text-gray-600 mt-0.5">Best</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3 text-center">
-            <div className="text-2xl font-bold text-green-600">
-              {user.total_entries ? Math.round((user.total_entries / 7) * 100) / 100 : 0}
-            </div>
-            <p className="text-xs text-gray-600 mt-0.5">Avg/Week</p>
-          </CardContent>
-        </Card>
+        <div className="bg-white rounded-2xl border border-gray-200 p-3 text-center">
+          <div className="text-2xl font-bold text-indigo-600">{user.total_entries || 0}</div>
+          <p className="text-xs text-gray-500 mt-0.5">Entries</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-200 p-3 text-center">
+          <div className="text-2xl font-bold text-orange-600 flex items-center justify-center gap-1">
+            <Flame className="w-5 h-5" />
+            {user.current_streak || 0}
+          </div>
+          <p className="text-xs text-gray-500 mt-0.5">Streak</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-200 p-3 text-center">
+          <div className="text-2xl font-bold text-purple-600">{user.longest_streak || 0}</div>
+          <p className="text-xs text-gray-500 mt-0.5">Best</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-200 p-3 text-center">
+          <div className="text-2xl font-bold text-green-600">
+            {user.total_entries ? Math.round((user.total_entries / 7) * 100) / 100 : 0}
+          </div>
+          <p className="text-xs text-gray-500 mt-0.5">Avg/Week</p>
+        </div>
       </div>
 
       {/* Two Column Layout - Compact */}
@@ -147,90 +134,82 @@ export default function ProfilePage() {
         <div className="space-y-3">
           {/* Mental Health Focus */}
           {(hasConcerns || !hasGoals) && (
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Target className="w-4 h-4 text-indigo-600" />
-                  <h2 className="text-sm font-semibold">Mental Health Focus</h2>
+            <div className="bg-white rounded-2xl border border-gray-200 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Target className="w-4 h-4 text-indigo-600" />
+                <h2 className="text-sm font-semibold">Mental Health Focus</h2>
+              </div>
+              {hasConcerns ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {user.mental_health_concerns.map((concern, idx) => (
+                    <span key={idx} className="inline-block text-xs px-2 py-0.5 bg-gray-100 rounded-full text-gray-700">
+                      {concern}
+                    </span>
+                  ))}
                 </div>
-                {hasConcerns ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {user.mental_health_concerns.map((concern, idx) => (
-                      <Badge key={idx} variant="secondary" className="text-xs px-2 py-0.5">
-                        {concern}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-gray-500">No concerns added yet</p>
-                )}
-              </CardContent>
-            </Card>
+              ) : (
+                <p className="text-xs text-gray-500">No concerns added yet</p>
+              )}
+            </div>
           )}
 
           {/* Journaling Goals */}
           {(hasGoals || !hasConcerns) && (
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <BookOpen className="w-4 h-4 text-purple-600" />
-                  <h2 className="text-sm font-semibold">Wellness Goals</h2>
-                </div>
-                {hasGoals ? (
-                  <ul className="space-y-1">
-                    {user.journaling_goals.map((goal, idx) => (
-                      <li key={idx} className="text-xs text-gray-700 flex items-start gap-1.5">
-                        <span className="text-purple-600 mt-0.5">•</span>
-                        <span>{goal}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-xs text-gray-500">No goals set yet</p>
-                )}
-              </CardContent>
-            </Card>
+            <div className="bg-white rounded-2xl border border-gray-200 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <BookOpen className="w-4 h-4 text-purple-600" />
+                <h2 className="text-sm font-semibold">Wellness Goals</h2>
+              </div>
+              {hasGoals ? (
+                <ul className="space-y-1">
+                  {user.journaling_goals.map((goal, idx) => (
+                    <li key={idx} className="text-xs text-gray-700 flex items-start gap-1.5">
+                      <span className="text-purple-600 mt-0.5">•</span>
+                      <span>{goal}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-gray-500">No goals set yet</p>
+              )}
+            </div>
           )}
         </div>
 
         {/* Right Column - Recent Activity */}
-        <Card>
-          <CardContent className="p-4">
-            <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-blue-600" />
-              Recent Activity
-            </h2>
-            <div className="space-y-2">
-              {[
-                { date: '2 days ago', action: 'Logged mood', emotion: '😊' },
-                { date: '5 days ago', action: 'Completed breathing exercise', emotion: '😌' },
-                { date: '1 week ago', action: 'Updated profile', emotion: '✨' },
-              ].map((activity, idx) => (
-                <div key={idx} className="flex items-start gap-2 p-2 rounded bg-gray-50">
-                  <span className="text-lg">{activity.emotion}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium">{activity.action}</p>
-                    <p className="text-xs text-gray-500">{activity.date}</p>
-                  </div>
+        <div className="bg-white rounded-2xl border border-gray-200 p-4">
+          <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-blue-600" />
+            Recent Activity
+          </h2>
+          <div className="space-y-2">
+            {[
+              { date: '2 days ago', action: 'Logged mood', emotion: '😊' },
+              { date: '5 days ago', action: 'Completed breathing exercise', emotion: '😌' },
+              { date: '1 week ago', action: 'Updated profile', emotion: '✨' },
+            ].map((activity, idx) => (
+              <div key={idx} className="flex items-start gap-2 p-2 rounded-xl bg-gray-50">
+                <span className="text-lg">{activity.emotion}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium">{activity.action}</p>
+                  <p className="text-xs text-gray-500">{activity.date}</p>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* CTA Card - Compact */}
       {(!hasConcerns || !hasGoals) && (
-        <Card className="border-dashed">
-          <CardContent className="p-4 text-center">
-            <p className="text-sm text-gray-600 mb-2">Complete your profile to get personalized insights</p>
-            <Link href="/profile/edit">
-              <Button size="sm" className="h-8 text-xs">
-                Complete Profile
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+        <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-4 text-center">
+          <p className="text-sm text-gray-500 mb-3">Complete your profile to get personalized insights</p>
+          <Link href="/profile/edit">
+            <button className="h-8 text-xs px-4 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium">
+              Complete Profile
+            </button>
+          </Link>
+        </div>
       )}
     </div>
   );

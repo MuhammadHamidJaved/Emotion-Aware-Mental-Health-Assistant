@@ -3,9 +3,6 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Calendar, Activity, Loader2 } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/contexts/auth-context'
 import { apiGetJournalEntries, type JournalEntry } from '@/lib/api'
 
@@ -70,45 +67,45 @@ export default function CheckInHistoryPage() {
   return (
     <div className="space-y-3">
       {/* Page Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Activity className="w-6 h-6" />
-            Check-In History
-          </h1>
-          <p className="text-sm text-neutral-600 mt-1">Track your emotional journey over time • {filteredEntries.length} check-ins</p>
+      <div className="bg-white border-b border-gray-200 -mx-4 sm:-mx-6 px-4 sm:px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center">
+            <Activity className="w-5 h-5 text-blue-600" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-gray-900">Check-In History</h1>
+            <p className="text-xs text-gray-500">Track your emotional journey over time &bull; {filteredEntries.length} check-ins</p>
+          </div>
         </div>
       </div>
 
 
       {/* Entries List - Compact */}
       {isLoading ? (
-        <Card>
-          <CardContent className="p-6 text-center">
-            <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-neutral-400" />
-            <p className="text-sm text-neutral-600">Loading entries...</p>
-          </CardContent>
-        </Card>
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 text-center">
+          <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-gray-300" />
+          <p className="text-sm text-gray-500">Loading entries...</p>
+        </div>
       ) : filteredEntries.length === 0 ? (
-        <Card>
-          <CardContent className="p-6 text-center">
-            <Activity className="w-12 h-12 mx-auto mb-4 text-neutral-300" />
-            <p className="text-neutral-600 mb-4">
-              {searchQuery ? 'No entries found matching your search' : 'No check-ins yet. Start by expressing how you\'re feeling!'}
-            </p>
-            {!searchQuery && (
-              <Link href="/check-in/new">
-                <Button>Create Your First Check-In</Button>
-              </Link>
-            )}
-          </CardContent>
-        </Card>
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 text-center">
+          <Activity className="w-12 h-12 mx-auto mb-4 text-gray-200" />
+          <p className="text-gray-500 mb-4">
+            {searchQuery ? 'No entries found matching your search' : 'No check-ins yet. Start by expressing how you\'re feeling!'}
+          </p>
+          {!searchQuery && (
+            <Link href="/check-in/new">
+              <button className="bg-black text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors">
+                Create Your First Check-In
+              </button>
+            </Link>
+          )}
+        </div>
       ) : (
         <div className="space-y-2">
           {filteredEntries.map((entry) => (
             <Link key={entry.id} href={`/check-in/${entry.id}`}>
-              <Card className="hover:border-black transition-colors">
-                <CardContent className="p-3">
+              <div className="bg-white rounded-2xl border border-gray-200 hover:border-black transition-colors cursor-pointer">
+                <div className="p-3">
                   <div className="flex items-start gap-2">
                     <div className="w-10 h-10 rounded-lg flex items-center justify-center text-xl flex-shrink-0" style={{ backgroundColor: (entry.emotion ? EMOTION_COLORS[entry.emotion] : '#9CA3AF') + '20' }}>
                       {getEmoji(entry.emotion || 'neutral')}
@@ -126,23 +123,23 @@ export default function CheckInHistoryPage() {
                       <p className="text-xs text-neutral-700 line-clamp-2">{getPreview(entry)}</p>
                       <div className="flex flex-wrap items-center gap-1 mt-1.5">
                         {entry.tags && entry.tags.map((tag, idx) => (
-                          <Badge key={idx} variant="secondary" className="text-xs px-1.5 py-0">
-                            {tag}
-                          </Badge>
-                        ))}
-                        {entry.emotion_confidence && (
-                          <Badge variant="outline" className="text-xs px-1.5 py-0">
-                            {Math.round(entry.emotion_confidence * 100)}% confident
-                          </Badge>
-                        )}
-                        <Badge variant="outline" className="text-xs px-1.5 py-0 capitalize">
-                          {entry.entry_type}
-                        </Badge>
+                        <span key={idx} className="text-xs px-1.5 py-0.5 bg-gray-100 rounded-full text-gray-600">
+                          {tag}
+                        </span>
+                      ))}
+                      {entry.emotion_confidence && (
+                        <span className="text-xs px-1.5 py-0.5 border border-gray-200 rounded-full text-gray-500">
+                          {Math.round(entry.emotion_confidence * 100)}% confident
+                        </span>
+                      )}
+                      <span className="text-xs px-1.5 py-0.5 border border-gray-200 rounded-full text-gray-500 capitalize">
+                        {entry.entry_type}
+                      </span>
                       </div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </Link>
           ))}
         </div>

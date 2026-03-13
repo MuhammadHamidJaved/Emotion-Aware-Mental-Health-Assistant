@@ -358,7 +358,7 @@ def recent_entries(request):
                 
                 # Get preview text - handle both encrypted and plain text gracefully
                 try:
-                    text_content = entry.get_text_content_display() or ''
+                    text_content = entry.get_text_content() or ''
                 except Exception as decrypt_error:
                     logger.warning(f"Could not decrypt text for entry {entry.id}: {decrypt_error}")
                     text_content = ''

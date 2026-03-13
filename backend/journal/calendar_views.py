@@ -193,8 +193,8 @@ def calendar_day_details(request):
             
             # Get decrypted content
             try:
-                title = entry.get_title_display() or 'Untitled Entry'
-                text_content = entry.get_text_content_display() or ''
+                title = entry.get_title() or 'Untitled Entry'
+                text_content = entry.get_text_content() or ''
                 if text_content and len(text_content) > 200:
                     text_content = text_content[:200] + '...'
             except Exception as decrypt_error:
