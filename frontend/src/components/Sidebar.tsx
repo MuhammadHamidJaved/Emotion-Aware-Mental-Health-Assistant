@@ -39,11 +39,11 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { isCollapsed, setIsCollapsed } = useSidebar();
-  const { logout } = useAuth();
+  const { logout, user, isLoading } = useAuth();
 
-  // Don't show sidebar on landing, login, signup, onboarding pages
-  const publicPages = ['/', '/login', '/signup', '/onboarding'];
-  if (publicPages.includes(pathname)) {
+  // Don't show sidebar on landing, login, signup, onboarding pages or if unauthenticated
+  const publicPages = ['/', '/login', '/signup', '/onboarding', '/privacy', '/terms'];
+  if (publicPages.includes(pathname) || (!isLoading && !user)) {
     return null;
   }
 

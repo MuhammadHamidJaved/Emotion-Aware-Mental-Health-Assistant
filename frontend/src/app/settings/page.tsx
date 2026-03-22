@@ -41,7 +41,7 @@ export default function SettingsPage() {
 
   // Notification Settings
   const [notifications, setNotifications] = useState<NotificationSettings>({
-    session_reminders: true,  // Changed from journal_reminders
+    session_reminders: true,  // Changed from assistant_reminders
     mood_insights: true,
     weekly_reports: false,
     streak_alerts: true,
@@ -419,7 +419,7 @@ export default function SettingsPage() {
                           case 'weekly_reports':
                             return 'Weekly summary of your emotional wellness';
                           case 'streak_alerts':
-                            return 'Notifications about your journaling streaks';
+                            return 'Notifications about your checking in streaks';
                           case 'ai_suggestions':
                             return 'Recommendations and suggestions from AI companion';
                           case 'email_notifications':

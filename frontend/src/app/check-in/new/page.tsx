@@ -60,7 +60,7 @@ export default function NewCheckInPage() {
       }
       
       // Call Django backend which will call the text emotion microservice
-      const response = await fetch('http://localhost:8000/api/journal/emotion/detect/text/', {
+      const response = await fetch('http://localhost:8000/api/assistant/emotion/detect/text/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -195,7 +195,7 @@ export default function NewCheckInPage() {
       }
       
       // Save to backend
-      const response = await fetch('http://localhost:8000/api/journal/entries/', {
+      const response = await fetch('http://localhost:8000/api/assistant/entries/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -273,7 +273,7 @@ export default function NewCheckInPage() {
       }
       
       // Call Django backend which will call the 7-class emotion microservice
-      const response = await fetch('http://localhost:8000/api/journal/emotion/detect/7class/', {
+      const response = await fetch('http://localhost:8000/api/assistant/emotion/detect/7class/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -799,10 +799,7 @@ export default function NewCheckInPage() {
                     </div>
                   </div>
 
-                  {/* Debug Info */}
-                  {console.log('[RENDER] Component rendering, liveEmotion:', liveEmotion)}
-                  {console.log('[RENDER] isRecording:', isRecording, 'isPredicting:', isPredicting, 'isAnalyzing:', isAnalyzing)}
-                  {console.log('[RENDER] Conditional check (!liveEmotion):', !liveEmotion)}
+
 
                   {!liveEmotion ? (
                     <div className="text-center py-12">

@@ -19,7 +19,7 @@ const XAxis = dynamic(() => import('recharts').then(mod => mod.XAxis), { ssr: fa
 const YAxis = dynamic(() => import('recharts').then(mod => mod.YAxis), { ssr: false });
 const CartesianGrid = dynamic(() => import('recharts').then(mod => mod.CartesianGrid), { ssr: false });
 const Tooltip = dynamic(() => import('recharts').then(mod => mod.Tooltip), { ssr: false });
-const Legend = dynamic(() => import('recharts').then(mod => mod.Legend), { ssr: false });
+const Legend = dynamic(() => import('recharts').then(mod => mod.Legend as any), { ssr: false });
 
 // Fallback data if no real data available - memoized
 const MOOD_HISTORY_FALLBACK = [

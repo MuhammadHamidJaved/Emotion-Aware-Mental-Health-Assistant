@@ -65,7 +65,7 @@ class NotificationService:
             notification_type='session_reminder',
             title='Time for your emotional check-in',
             message='Take a moment to reflect on how you\'re feeling today.',
-            action_url='/journal/new'
+            action_url='/check-in/new'
         )
     
     @staticmethod

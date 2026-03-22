@@ -12,10 +12,11 @@ export type User = {
   date_of_birth?: string | null;
   phone_number?: string | null;
   mental_health_concerns?: string[];
-  journaling_goals?: string[];
-  preferred_journal_time?: string | null;
+  mood_tracking_goals?: string[];
+  preferred_checkin_time?: string | null;
   enable_biometric?: boolean;
   enable_notifications?: boolean;
+  onboarding_complete?: boolean;
   total_entries?: number;
   current_streak?: number;
   longest_streak?: number;
@@ -334,8 +335,8 @@ export async function apiGetRecentEntries(
   }
 }
 
-// Journal Entries API types
-export type JournalEntry = {
+// assistant Entries API types
+export type CheckInEntry = {
   id: number;
   entry_type: 'text' | 'voice' | 'video';
   title?: string;
@@ -352,18 +353,18 @@ export type JournalEntry = {
   is_draft?: boolean;
 };
 
-// Journal Entries API functions
-export async function apiGetJournalEntries(
+// assistant Entries API functions
+export async function apiGetCheckInEntries(
   accessToken: string,
   entryType?: string,
   emotion?: string
-): Promise<JournalEntry[]> {
+): Promise<CheckInEntry[]> {
   try {
     const params = new URLSearchParams();
     if (entryType) params.append('type', entryType);
     if (emotion) params.append('emotion', emotion);
     
-    const url = `${API_URL}/api/journal/entries/${params.toString() ? '?' + params.toString() : ''}`;
+    const url = `${API_URL}/api/assistant/entries/${params.toString() ? '?' + params.toString() : ''}`;
     const res = await fetch(url, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -371,12 +372,12 @@ export async function apiGetJournalEntries(
     });
 
     if (!res.ok) {
-      throw new Error('Failed to load journal entries.');
+      throw new Error('Failed to load assistant entries.');
     }
 
     return res.json();
   } catch (error) {
-    console.error('Error fetching journal entries:', error);
+    console.error('Error fetching assistant entries:', error);
     return [];
   }
 }
@@ -528,7 +529,7 @@ export type ProfileSettings = {
 };
 
 export type NotificationSettings = {
-  session_reminders: boolean;  // Changed from journal_reminders
+  session_reminders: boolean;  // Changed from assistant_reminders
   mood_insights: boolean;
   weekly_reports: boolean;
   streak_alerts: boolean;

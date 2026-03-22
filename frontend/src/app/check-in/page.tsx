@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Calendar, Activity, Loader2 } from 'lucide-react'
 import { useAuth } from '@/contexts/auth-context'
-import { apiGetJournalEntries, type JournalEntry } from '@/lib/api'
+import { apiGetCheckInEntries, type CheckInEntry } from '@/lib/api'
 
 const EMOTION_COLORS: Record<string, string> = {
   happy: '#FCD34D', sad: '#6366F1', angry: '#EF4444', anxious: '#EC4899',
@@ -15,7 +15,7 @@ const EMOTION_COLORS: Record<string, string> = {
 
 export default function CheckInHistoryPage() {
   const [searchQuery, setSearchQuery] = useState('')
-  const [entries, setEntries] = useState<JournalEntry[]>([])
+  const [entries, setEntries] = useState<CheckInEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const { getAccessToken } = useAuth()
 
@@ -35,7 +35,7 @@ export default function CheckInHistoryPage() {
       
       setIsLoading(true)
       try {
-        const data = await apiGetJournalEntries(token)
+        const data = await apiGetCheckInEntries(token)
         // Filter out drafts and sort by date (newest first)
         const nonDraftEntries = data
           .filter(entry => !entry.is_draft)
@@ -59,7 +59,7 @@ export default function CheckInHistoryPage() {
     return content.includes(searchText) || tags.includes(searchText) || emotion.includes(searchText)
   })
 
-  const getPreview = (entry: JournalEntry) => {
+  const getPreview = (entry: CheckInEntry) => {
     const content = entry.text_content || entry.transcription || entry.title || ''
     return content.length > 100 ? content.substring(0, 100) + '...' : content
   }

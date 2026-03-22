@@ -2,14 +2,16 @@
 
 import { useSidebar } from '@/contexts/sidebar-context';
 import { usePathname } from 'next/navigation';
+import { useAuth } from '@/contexts/auth-context';
 
 export default function MainContent({ children }: { children: React.ReactNode }) {
   const { isCollapsed } = useSidebar();
+  const { user, isLoading } = useAuth();
   const pathname = usePathname();
 
-  // Public pages don't need sidebar/header spacing
-  const publicPages = ['/', '/login', '/signup', '/onboarding'];
-  const isPublicPage = publicPages.includes(pathname);
+  // Public pages or unauthenticated state don't need sidebar/header spacing
+  const publicPages = ['/', '/login', '/signup', '/onboarding', '/privacy', '/terms'];
+  const isPublicPage = publicPages.includes(pathname) || (!isLoading && !user);
 
   return (
     <main

@@ -67,7 +67,7 @@ export default function SignupPage() {
               <Brain className="h-5 w-5 text-white" />
             </div>
             <div>
-              <p className="text-sm font-medium text-neutral-900">EmotionJournal</p>
+              <p className="text-sm font-medium text-neutral-900">Emotionassistant</p>
               <p className="text-xs text-neutral-500">Personalized mental health companion</p>
             </div>
           </div>
@@ -75,10 +75,10 @@ export default function SignupPage() {
           <div className="space-y-3">
             <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">
               Create your account,
-              <span className="block text-neutral-500">start your emotion-aware journaling</span>
+              <span className="block text-neutral-500">start your emotion-aware checking in</span>
             </h1>
             <p className="max-w-md text-sm leading-relaxed text-neutral-600">
-              Join EmotionJournal to track your mood, understand emotional patterns, and receive tailored
+              Join Emotionassistant to track your mood, understand emotional patterns, and receive tailored
               recommendations powered by machine learning.
             </p>
           </div>

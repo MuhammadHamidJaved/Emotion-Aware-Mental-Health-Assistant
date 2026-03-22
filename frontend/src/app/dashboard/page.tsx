@@ -178,7 +178,8 @@ export default function DashboardPage() {
       <div className="space-y-4 pt-6">
         {/* Assistant Greeting Card - PRIMARY FOCUS */}
         {!isLoading && (
-          <div className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 overflow-hidden p-6">
+          <>
+            <div className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 overflow-hidden p-6">
               <div className="flex items-start gap-4">
                 {/* Assistant Avatar */}
                 <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg flex-shrink-0">
@@ -231,7 +232,7 @@ export default function DashboardPage() {
                       💡 How can I help you today?
                     </p>
                     <div className="grid grid-cols-3 gap-2">
-                      <Link href="/companion">
+                      <Link href="/chat">
                         <div className="p-3 bg-white/80 rounded-lg border border-neutral-200 hover:border-indigo-300 hover:shadow-sm transition-all cursor-pointer text-center">
                           <MessageCircle className="w-5 h-5 mx-auto mb-1.5 text-indigo-600" />
                           <p className="text-xs font-medium">Chat</p>
@@ -254,9 +255,10 @@ export default function DashboardPage() {
                 </div>
               </div>
           </div>
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-            {error}
-          </div>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+              {error}
+            </div>
+          </>
         )}
 
         {/* Loading State - Better Design */}

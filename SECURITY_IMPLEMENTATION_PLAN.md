@@ -1,6 +1,6 @@
 # Security Implementation Plan
 
-This document outlines the security features that need to be implemented to enhance the security posture of the Emotion Journal System, especially for production deployment.
+This document outlines the security features that need to be implemented to enhance the security posture of the Emotion Assistant System, especially for production deployment.
 
 ---
 
@@ -258,7 +258,7 @@ if user.locked_until and user.locked_until > timezone.now():
 - Add XSS protection for stored content
 
 **Files to Modify:**
-- `backend/journal/serializers.py`
+- `backend/Assistant/serializers.py`
 - `backend/users/serializers.py`
 - Consider using `bleach` for HTML sanitization
 
@@ -276,7 +276,7 @@ if user.locked_until and user.locked_until > timezone.now():
 
 **Files to Modify:**
 - `backend/users/views.py`
-- `backend/journal/views.py`
+- `backend/Assistant/views.py`
 - Create logging configuration
 
 **Example:**

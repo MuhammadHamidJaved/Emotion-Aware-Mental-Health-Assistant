@@ -50,7 +50,7 @@ INSTALLED_APPS = [
     
     # Local apps
     'users',
-    'journal',
+    'assistant',
     'emotions',
     'recommendations',
 ]

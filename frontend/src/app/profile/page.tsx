@@ -27,7 +27,7 @@ export default function ProfilePage() {
   const displayName = user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'User';
   const initials = displayName.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
   const hasConcerns = !!(user.mental_health_concerns && user.mental_health_concerns.length > 0);
-  const hasGoals = !!(user.journaling_goals && user.journaling_goals.length > 0);
+  const hasGoals = !!(user.mood_tracking_goals && user.mood_tracking_goals.length > 0);
 
   return (
     <div className="space-y-4">
@@ -92,10 +92,10 @@ export default function ProfilePage() {
                     {user.phone_number}
                   </span>
                 )}
-                {user.preferred_journal_time && (
+                {user.preferred_checkin_time && (
                   <span className="flex items-center gap-1">
                     <Clock className="w-3 h-3" />
-                    {user.preferred_journal_time}
+                    {user.preferred_checkin_time}
                   </span>
                 )}
               </div>
@@ -141,7 +141,7 @@ export default function ProfilePage() {
               </div>
               {hasConcerns ? (
                 <div className="flex flex-wrap gap-1.5">
-                  {user.mental_health_concerns.map((concern, idx) => (
+                  {user.mental_health_concerns?.map((concern, idx) => (
                     <span key={idx} className="inline-block text-xs px-2 py-0.5 bg-gray-100 rounded-full text-gray-700">
                       {concern}
                     </span>
@@ -153,7 +153,7 @@ export default function ProfilePage() {
             </div>
           )}
 
-          {/* Journaling Goals */}
+          {/* Mood Tracking Goals */}
           {(hasGoals || !hasConcerns) && (
             <div className="bg-white rounded-2xl border border-gray-200 p-4">
               <div className="flex items-center gap-2 mb-2">
@@ -162,7 +162,7 @@ export default function ProfilePage() {
               </div>
               {hasGoals ? (
                 <ul className="space-y-1">
-                  {user.journaling_goals.map((goal, idx) => (
+                  {user.mood_tracking_goals?.map((goal, idx) => (
                     <li key={idx} className="text-xs text-gray-700 flex items-start gap-1.5">
                       <span className="text-purple-600 mt-0.5">•</span>
                       <span>{goal}</span>

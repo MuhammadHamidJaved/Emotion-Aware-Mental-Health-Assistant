@@ -22,11 +22,10 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      await login(email, password)
+      const loggedInUser = await login(email, password)
 
-      // You can later replace this with a real flag from backend/user profile
-      const onboardingComplete = localStorage.getItem('onboardingComplete')
-      if (onboardingComplete === 'true') {
+      // Use the backend user object as the source of truth for onboarding status
+      if (loggedInUser.onboarding_complete) {
         router.push('/dashboard')
       } else {
         router.push('/onboarding')
@@ -48,7 +47,7 @@ export default function LoginPage() {
               <Brain className="h-5 w-5 text-white" />
             </div>
             <div>
-              <p className="text-sm font-medium text-neutral-900">EmotionJournal</p>
+              <p className="text-sm font-medium text-neutral-900">Emotionassistant</p>
               <p className="text-xs text-neutral-500">Emotion-aware mental health assistant</p>
             </div>
           </div>
@@ -59,7 +58,7 @@ export default function LoginPage() {
               <span className="block text-neutral-500">let&apos;s continue your journey</span>
             </h1>
             <p className="max-w-md text-sm leading-relaxed text-neutral-600">
-              Sign in to access your emotion-aware journal, personalized recommendations, and AI-powered insights
+              Sign in to access your emotion-aware assistant, personalized recommendations, and AI-powered insights
               designed to support your mental well-being.
             </p>
           </div>

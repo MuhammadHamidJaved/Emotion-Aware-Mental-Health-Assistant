@@ -11,11 +11,11 @@ import Image from 'next/image';
 export default function Header() {
   const pathname = usePathname();
   const { isCollapsed } = useSidebar();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
 
-  // Don't show header on landing, login, signup, onboarding pages
-  const publicPages = ['/', '/login', '/signup', '/onboarding'];
-  if (publicPages.includes(pathname)) {
+  // Don't show header on landing, login, signup, onboarding pages or if unauthenticated
+  const publicPages = ['/', '/login', '/signup', '/onboarding', '/privacy', '/terms'];
+  if (publicPages.includes(pathname) || (!isLoading && !user)) {
     return null;
   }
 

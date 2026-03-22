@@ -2,7 +2,7 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 from django.utils import timezone
 import cloudinary.uploader
 
@@ -80,7 +80,8 @@ class MeView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
+    # JSON for API clients; multipart/form for profile picture uploads
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get(self, request):
         user = request.user
@@ -109,7 +110,7 @@ class MeView(APIView):
             try:
                 upload_result = cloudinary.uploader.upload(
                     profile_file,
-                    folder="emotion-journal/profile_pictures",
+                    folder="emotion-assistant/profile_pictures",
                     resource_type="image",
                 )
                 data["profile_picture"] = upload_result.get("secure_url")

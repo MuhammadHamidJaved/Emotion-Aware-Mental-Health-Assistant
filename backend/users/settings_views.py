@@ -94,7 +94,7 @@ def settings_profile(request):
                 try:
                     upload_result = cloudinary.uploader.upload(
                         profile_file,
-                        folder="emotion-journal/profile_pictures",
+                        folder="emotion-assistant/profile_pictures",
                         resource_type="image",
                     )
                     data['profile_picture'] = upload_result.get("secure_url")

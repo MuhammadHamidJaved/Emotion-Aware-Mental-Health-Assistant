@@ -11,7 +11,7 @@ export default function Home() {
             <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
               <Brain className="w-5 h-5 text-white" />
             </div>
-            <span className="text-xl font-bold">EmotionJournal</span>
+            <span className="text-xl font-bold">Emotionassistant</span>
           </div>
           
           <nav className="hidden md:flex items-center gap-8">
@@ -113,7 +113,7 @@ export default function Home() {
             </div>
             <h3 className="text-2xl font-bold mb-3">Text Analysis</h3>
             <p className="text-neutral-600 mb-4">
-              Our NLP model achieves 94.7% accuracy in detecting emotions from written journal entries.
+              Our NLP model achieves 94.7% accuracy in detecting emotions from written assistant entries.
             </p>
             <div className="text-sm text-neutral-500">
               Model: BERT-based classifier • 8 emotion classes
@@ -310,7 +310,7 @@ export default function Home() {
         <div className="bg-neutral-50 rounded-2xl p-12 text-center">
           <h2 className="text-4xl font-bold mb-4">Ready to understand your emotions?</h2>
           <p className="text-xl text-neutral-600 mb-8">
-            Start journaling with AI-powered emotion detection today.
+            Start checking in with AI-powered emotion detection today.
           </p>
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -334,7 +334,7 @@ export default function Home() {
                 <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
                   <Brain className="w-5 h-5 text-white" />
                 </div>
-                <span className="font-bold">EmotionJournal</span>
+                <span className="font-bold">Emotionassistant</span>
               </div>
               <p className="text-sm text-neutral-600">AI-powered emotion detection for mental wellness</p>
             </div>
@@ -369,7 +369,7 @@ export default function Home() {
           </div>
           
           <div className="border-t border-neutral-200 pt-8 text-center text-sm text-neutral-600">
-            © 2025 EmotionJournal. All rights reserved. Built for FYP-1.
+            © 2025 Emotionassistant. All rights reserved. Built for FYP-1.
           </div>
         </div>
       </footer>

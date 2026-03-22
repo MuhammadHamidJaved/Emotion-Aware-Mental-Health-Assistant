@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
@@ -7,16 +6,6 @@ import { SidebarProvider } from "@/contexts/sidebar-context";
 import MainContent from "@/components/MainContent";
 import { AuthProvider } from "@/contexts/auth-context";
 import { MoodProvider } from "@/contexts/mood-context";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "EmotionAI - AI-Powered Emotional Wellness",
@@ -31,7 +20,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className="antialiased"
+        style={{ fontFamily: "'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif" }}
         suppressHydrationWarning
       >
         <AuthProvider>

@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Activity, Brain, Mic, Video, TrendingUp, Zap, CheckCircle, Clock } from 'lucide-react'
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { Activity, Brain, Mic, Video, Zap, CheckCircle, Clock } from 'lucide-react'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { ML_MODELS, TEXT_MODEL_PERFORMANCE, VOICE_MODEL_PERFORMANCE, VIDEO_MODEL_PERFORMANCE, TRAINING_HISTORY } from '@/data/ml-data'
 
 export default function MLModelsPage() {
@@ -10,11 +10,11 @@ export default function MLModelsPage() {
   
   const getModelIcon = (type: string) => {
     switch(type) {
-      case 'text': return <Brain className="w-5 h-5" />
-      case 'voice': return <Mic className="w-5 h-5" />
-      case 'video': return <Video className="w-5 h-5" />
-      case 'multimodal': return <Zap className="w-5 h-5" />
-      default: return <Activity className="w-5 h-5" />
+      case 'text': return <Brain className="w-4 h-4" />
+      case 'voice': return <Mic className="w-4 h-4" />
+      case 'video': return <Video className="w-4 h-4" />
+      case 'multimodal': return <Zap className="w-4 h-4" />
+      default: return <Activity className="w-4 h-4" />
     }
   }
 
@@ -39,250 +39,246 @@ export default function MLModelsPage() {
   const trainingData = getTrainingData(selectedModel.type)
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 -mx-4 sm:-mx-6 px-4 sm:px-6 py-4">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-purple-100 rounded-xl flex items-center justify-center">
-            <Brain className="w-5 h-5 text-purple-600" />
+    <div className="space-y-4">
+      {/* Compact Header */}
+      <div className="flex items-center justify-between bg-white rounded-xl border border-gray-200 px-5 py-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
+            <Brain className="w-4 h-4 text-white" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-gray-900">ML Models Dashboard</h1>
-            <p className="text-xs text-gray-500">Monitor and manage emotion detection models</p>
+            <h1 className="text-base font-bold text-gray-900 leading-tight">ML Models</h1>
+            <p className="text-[11px] text-gray-500">Monitor and manage emotion detection models</p>
           </div>
+        </div>
+        <div className="text-xs text-gray-400">
+          {ML_MODELS.filter(m => m.status === 'active').length} active · {ML_MODELS.length} total
         </div>
       </div>
 
-        {/* Model Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {ML_MODELS.map((model) => (
-            <button
-              key={model.id}
-              onClick={() => setSelectedModel(model)}
-              className={`p-4 rounded-xl border-2 transition-all text-left ${
-                selectedModel.id === model.id
-                  ? 'border-black bg-neutral-50'
-                  : 'border-neutral-200 hover:border-neutral-300'
-              }`}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="p-2 bg-white border border-neutral-200 rounded-lg">
-                  {getModelIcon(model.type)}
-                </div>
-                <span className={`text-xs px-2 py-1 rounded ${
-                  model.status === 'active' 
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-yellow-100 text-yellow-700'
-                }`}>
-                  {model.status}
-                </span>
+      {/* Model Selector Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+        {ML_MODELS.map((model) => (
+          <button
+            key={model.id}
+            onClick={() => setSelectedModel(model)}
+            className={`p-3.5 rounded-xl border-2 transition-all text-left ${
+              selectedModel.id === model.id
+                ? 'border-black bg-gray-50 shadow-sm'
+                : 'border-gray-200 hover:border-gray-300 bg-white'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className={`p-1.5 rounded-lg ${selectedModel.id === model.id ? 'bg-black text-white' : 'bg-gray-100 text-gray-600'} transition-colors`}>
+                {getModelIcon(model.type)}
               </div>
-              <h3 className="font-semibold mb-1">{model.name}</h3>
-              <p className="text-xs text-neutral-500 mb-2">{model.version}</p>
-              <div className="text-2xl font-bold">{(model.accuracy * 100).toFixed(1)}%</div>
-              <p className="text-xs text-neutral-600">Accuracy</p>
-            </button>
-          ))}
-        </div>
-
-        {/* Selected Model Details */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Performance Metrics */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Key Metrics */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6">
-              <h2 className="text-xl font-bold mb-4">Performance Metrics</h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="p-4 bg-neutral-50 rounded-lg">
-                  <div className="text-sm text-neutral-600 mb-1">Accuracy</div>
-                  <div className="text-2xl font-bold">{(performance.accuracy * 100).toFixed(1)}%</div>
-                </div>
-                <div className="p-4 bg-neutral-50 rounded-lg">
-                  <div className="text-sm text-neutral-600 mb-1">Precision</div>
-                  <div className="text-2xl font-bold">{(performance.precision * 100).toFixed(1)}%</div>
-                </div>
-                <div className="p-4 bg-neutral-50 rounded-lg">
-                  <div className="text-sm text-neutral-600 mb-1">Recall</div>
-                  <div className="text-2xl font-bold">{(performance.recall * 100).toFixed(1)}%</div>
-                </div>
-                <div className="p-4 bg-neutral-50 rounded-lg">
-                  <div className="text-sm text-neutral-600 mb-1">F1 Score</div>
-                  <div className="text-2xl font-bold">{(performance.f1Score * 100).toFixed(1)}%</div>
-                </div>
-              </div>
+              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                model.status === 'active' 
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : 'bg-amber-50 text-amber-700'
+              }`}>
+                {model.status}
+              </span>
             </div>
+            <h3 className="font-semibold text-xs text-gray-900 mb-0.5 truncate">{model.name}</h3>
+            <p className="text-[10px] text-gray-400 mb-1.5">{model.version}</p>
+            <div className="text-xl font-bold text-gray-900">{(model.accuracy * 100).toFixed(1)}%</div>
+          </button>
+        ))}
+      </div>
 
-            {/* Training History Chart */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6">
-              <h2 className="text-xl font-bold mb-4">Training History</h2>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={trainingData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
-                  <XAxis dataKey="epoch" stroke="#737373" />
-                  <YAxis stroke="#737373" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'white', 
-                      border: '1px solid #e5e5e5',
-                      borderRadius: '8px'
-                    }} 
-                  />
-                  <Legend />
-                  <Line 
-                    type="monotone" 
-                    dataKey="trainAcc" 
-                    stroke="#000000" 
-                    strokeWidth={2}
-                    name="Training Accuracy"
-                    dot={{ fill: '#000000' }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="valAcc" 
-                    stroke="#737373" 
-                    strokeWidth={2}
-                    name="Validation Accuracy"
-                    dot={{ fill: '#737373' }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Left: Charts and Metrics */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Performance Metrics Row */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h2 className="text-sm font-bold text-gray-900 mb-3">Performance Metrics</h2>
+            <div className="grid grid-cols-4 gap-3">
+              {[
+                { label: 'Accuracy', value: performance.accuracy },
+                { label: 'Precision', value: performance.precision },
+                { label: 'Recall', value: performance.recall },
+                { label: 'F1 Score', value: performance.f1Score },
+              ].map((metric) => (
+                <div key={metric.label} className="bg-gray-50 rounded-lg p-3 text-center">
+                  <div className="text-[11px] text-gray-500 mb-1">{metric.label}</div>
+                  <div className="text-lg font-bold text-gray-900">{(metric.value * 100).toFixed(1)}%</div>
+                </div>
+              ))}
             </div>
+          </div>
 
-            {/* Confusion Matrix */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6">
-              <h2 className="text-xl font-bold mb-4">Confusion Matrix</h2>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr>
-                      <th className="p-2 text-left font-medium text-neutral-600">True / Pred</th>
-                      {performance.classLabels.map((label) => (
-                        <th key={label} className="p-2 text-center font-medium text-neutral-600 text-xs">
-                          {label}
-                        </th>
+          {/* Training History Chart */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h2 className="text-sm font-bold text-gray-900 mb-3">Training History</h2>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={trainingData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="epoch" stroke="#a3a3a3" tick={{ fontSize: 11 }} />
+                <YAxis stroke="#a3a3a3" tick={{ fontSize: 11 }} />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'white', 
+                    border: '1px solid #e5e5e5',
+                    borderRadius: '8px',
+                    fontSize: '12px'
+                  }} 
+                />
+                <Legend wrapperStyle={{ fontSize: '11px' }} />
+                <Line 
+                  type="monotone" 
+                  dataKey="trainAcc" 
+                  stroke="#000000" 
+                  strokeWidth={2}
+                  name="Train Acc"
+                  dot={{ fill: '#000000', r: 2 }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="valAcc" 
+                  stroke="#a3a3a3" 
+                  strokeWidth={2}
+                  name="Val Acc"
+                  dot={{ fill: '#a3a3a3', r: 2 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Confusion Matrix */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h2 className="text-sm font-bold text-gray-900 mb-3">Confusion Matrix</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr>
+                    <th className="p-1.5 text-left font-medium text-gray-500 text-[10px]">True / Pred</th>
+                    {performance.classLabels.map((label) => (
+                      <th key={label} className="p-1.5 text-center font-medium text-gray-500 text-[10px] capitalize">
+                        {label.slice(0, 4)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {performance.confusionMatrix.map((row, i) => (
+                    <tr key={i}>
+                      <td className="p-1.5 font-medium text-gray-700 text-[10px] capitalize">
+                        {performance.classLabels[i]}
+                      </td>
+                      {row.map((value, j) => (
+                        <td 
+                          key={j} 
+                          className={`p-1.5 text-center text-[10px] rounded ${
+                            i === j 
+                              ? 'bg-black text-white font-bold' 
+                              : value > 10 
+                                ? 'bg-red-50 text-red-700 font-medium' 
+                                : 'bg-gray-50 text-gray-600'
+                          }`}
+                        >
+                          {value}
+                        </td>
                       ))}
                     </tr>
-                  </thead>
-                  <tbody>
-                    {performance.confusionMatrix.map((row, i) => (
-                      <tr key={i}>
-                        <td className="p-2 font-medium text-neutral-700 text-xs">
-                          {performance.classLabels[i]}
-                        </td>
-                        {row.map((value, j) => (
-                          <td 
-                            key={j} 
-                            className={`p-2 text-center text-xs ${
-                              i === j 
-                                ? 'bg-black text-white font-bold' 
-                                : value > 10 
-                                  ? 'bg-red-100 text-red-700' 
-                                  : 'bg-neutral-50'
-                            }`}
-                          >
-                            {value}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          {/* Model Info Sidebar */}
-          <div className="space-y-6">
-            {/* Model Details */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6">
-              <h2 className="text-xl font-bold mb-4">Model Details</h2>
-              <div className="space-y-4">
-                <div>
-                  <div className="text-sm text-neutral-600 mb-1">Model Name</div>
-                  <div className="font-medium">{selectedModel.name}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-neutral-600 mb-1">Version</div>
-                  <div className="font-medium">{selectedModel.version}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-neutral-600 mb-1">Type</div>
-                  <div className="flex items-center gap-2">
-                    {getModelIcon(selectedModel.type)}
-                    <span className="font-medium capitalize">{selectedModel.type}</span>
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm text-neutral-600 mb-1">Status</div>
-                  <div className="flex items-center gap-2">
-                    {selectedModel.status === 'active' ? (
-                      <CheckCircle className="w-4 h-4 text-green-600" />
-                    ) : (
-                      <Clock className="w-4 h-4 text-yellow-600" />
-                    )}
-                    <span className="font-medium capitalize">{selectedModel.status}</span>
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm text-neutral-600 mb-1">Last Trained</div>
-                  <div className="font-medium">
-                    {new Date(selectedModel.lastTrained).toLocaleString()}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm text-neutral-600 mb-1">Total Predictions</div>
-                  <div className="font-medium">{selectedModel.totalPredictions.toLocaleString()}</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6">
-              <h2 className="text-xl font-bold mb-4">Actions</h2>
-              <div className="space-y-3">
-                <button className="w-full py-2 px-4 bg-black text-white rounded-lg hover:bg-neutral-800 transition-colors text-sm font-medium">
-                  Retrain Model
-                </button>
-                <button className="w-full py-2 px-4 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors text-sm font-medium">
-                  Export Model
-                </button>
-                <button className="w-full py-2 px-4 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors text-sm font-medium">
-                  View Logs
-                </button>
-                <button className="w-full py-2 px-4 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors text-sm font-medium">
-                  Deactivate Model
-                </button>
-              </div>
-            </div>
-
-            {/* Class Distribution */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6">
-              <h2 className="text-xl font-bold mb-4">Class Distribution</h2>
-              <div className="space-y-2">
-                {performance.classLabels.map((label, i) => {
-                  const total = performance.confusionMatrix[i].reduce((a, b) => a + b, 0)
-                  const correct = performance.confusionMatrix[i][i]
-                  const accuracy = (correct / total * 100).toFixed(1)
-                  
-                  return (
-                    <div key={label}>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="capitalize">{label}</span>
-                        <span className="font-medium">{accuracy}%</span>
-                      </div>
-                      <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-black transition-all"
-                          style={{ width: `${accuracy}%` }}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
+
+        {/* Right Sidebar */}
+        <div className="space-y-4">
+          {/* Model Details */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h2 className="text-sm font-bold text-gray-900 mb-3">Model Details</h2>
+            <div className="space-y-3">
+              {[
+                { label: 'Name', value: selectedModel.name },
+                { label: 'Version', value: selectedModel.version },
+              ].map((item) => (
+                <div key={item.label}>
+                  <div className="text-[11px] text-gray-500">{item.label}</div>
+                  <div className="text-sm font-medium text-gray-900">{item.value}</div>
+                </div>
+              ))}
+              <div>
+                <div className="text-[11px] text-gray-500">Type</div>
+                <div className="flex items-center gap-1.5">
+                  {getModelIcon(selectedModel.type)}
+                  <span className="text-sm font-medium capitalize text-gray-900">{selectedModel.type}</span>
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] text-gray-500">Status</div>
+                <div className="flex items-center gap-1.5">
+                  {selectedModel.status === 'active' ? (
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                  ) : (
+                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                  )}
+                  <span className="text-sm font-medium capitalize text-gray-900">{selectedModel.status}</span>
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] text-gray-500">Last Trained</div>
+                <div className="text-sm font-medium text-gray-900">
+                  {new Date(selectedModel.lastTrained).toLocaleDateString()}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] text-gray-500">Total Predictions</div>
+                <div className="text-sm font-medium text-gray-900">{selectedModel.totalPredictions.toLocaleString()}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Per-Class Accuracy */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h2 className="text-sm font-bold text-gray-900 mb-3">Per-Class Accuracy</h2>
+            <div className="space-y-2">
+              {performance.classLabels.map((label, i) => {
+                const total = performance.confusionMatrix[i].reduce((a, b) => a + b, 0)
+                const correct = performance.confusionMatrix[i][i]
+                const accuracy = (correct / total * 100).toFixed(1)
+                
+                return (
+                  <div key={label}>
+                    <div className="flex justify-between text-[11px] mb-0.5">
+                      <span className="capitalize text-gray-700">{label}</span>
+                      <span className="font-semibold text-gray-900">{accuracy}%</span>
+                    </div>
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-black rounded-full transition-all"
+                        style={{ width: `${accuracy}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h2 className="text-sm font-bold text-gray-900 mb-3">Actions</h2>
+            <div className="space-y-2">
+              <button className="w-full py-2 px-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-xs font-medium">
+                Retrain Model
+              </button>
+              <button className="w-full py-2 px-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-xs font-medium text-gray-700">
+                Export Model
+              </button>
+              <button className="w-full py-2 px-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-xs font-medium text-gray-700">
+                View Logs
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

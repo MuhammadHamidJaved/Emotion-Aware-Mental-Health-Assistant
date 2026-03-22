@@ -16,7 +16,7 @@ class Recommendation(models.Model):
         ('creative', 'Creative Activity'),
         ('rest', 'Rest & Relaxation'),
         ('therapy', 'Professional Support'),
-        ('journaling', 'Journaling'),
+        ('self_expression', 'Journaling & Self-Expression'),
         ('other', 'Other'),
     ]
     

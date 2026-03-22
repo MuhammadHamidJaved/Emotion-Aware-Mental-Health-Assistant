@@ -1,11 +1,11 @@
-# Emotion-Aware Mental Health Journaling System
+# Emotion-Aware Mental Health Assistanting System
 
-A comprehensive mental health journaling platform with multimodal emotion recognition (text, voice, video), AI companion chat, and personalized wellness recommendations.
+A comprehensive mental health Assistanting platform with multimodal emotion recognition (text, voice, video), AI companion chat, and personalized wellness recommendations.
 
 ## 📁 Project Structure
 
 ```
-emotion-journal-system/
+emotion-Assistant-system/
 ├── frontend/          # Next.js 14 web application (React.js)
 ├── backend/           # Django REST API
 └── docs/             # Documentation and design files
@@ -47,7 +47,7 @@ Backend will run on `http://localhost:8000`
 - ✅ Landing page with marketing content
 - ✅ User authentication (Sign up, Login, Password reset)
 - ✅ Dashboard with emotion tracking and insights
-- ✅ Multimodal journaling (text, voice, video)
+- ✅ Multimodal Assistanting (text, voice, video)
 - ✅ AI companion chat interface
 - ✅ Analytics and insights visualization
 - ✅ Personalized recommendations
@@ -58,7 +58,7 @@ Backend will run on `http://localhost:8000`
 - ✅ RESTful API endpoints
 - ✅ JWT authentication
 - ✅ User management
-- ✅ Journal entry CRUD operations
+- ✅ Assistant entry CRUD operations
 - ✅ Emotion detection integration (future)
 - ✅ AI chat integration (future)
 
