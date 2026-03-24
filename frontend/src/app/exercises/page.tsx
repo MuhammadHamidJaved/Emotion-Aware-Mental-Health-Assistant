@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Dumbbell, Play, Check, Clock, Target, TrendingUp, Calendar as CalendarIcon, RefreshCw, Loader2, Settings } from 'lucide-react';
+import { Dumbbell, Play, Check, Clock, Target, TrendingUp, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 import { apiGetPersonalizedRecommendations, apiSendRecommendationFeedback, apiGetRecommendationSettings, type ExerciseRecommendation, type RecommendationSettings } from '@/lib/api';
 
 interface Exercise {
@@ -221,77 +221,78 @@ export default function ExercisesPage() {
   }, 0);
 
   return (
-    <div className="min-h-screen bg-gray-50 text-black">
-      {/* Top bar */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center">
-              <Dumbbell className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold leading-none">Wellness Exercises</h1>
-              <p className="text-xs text-gray-500 mt-0.5">{usingFallback ? 'Default library' : 'Personalized for you'}</p>
-            </div>
+    <div className="min-h-[calc(100vh-4rem)] bg-neutral-50 text-black -mx-4 sm:-mx-6">
+      <div className="bg-white border-b border-neutral-200 px-4 sm:px-6 py-3.5">
+        <div className="max-w-6xl mx-auto flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 shrink-0 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center shadow-sm">
+            <Dumbbell className="w-4 h-4 text-white" />
           </div>
-          <div className="flex items-center gap-2">
-            <a href="/settings" className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Personalization settings">
-              <Settings className="w-4 h-4 text-gray-500" />
-            </a>
-            <button onClick={() => fetchPersonalizedExercises(selectedEmotion)} disabled={isLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-xs font-medium disabled:opacity-50">
-              <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
-            </button>
+          <div className="min-w-0">
+            <h1 className="text-lg font-bold text-neutral-900 leading-tight">Wellness Exercises</h1>
+            <p className="text-xs text-neutral-500 mt-0.5 truncate">
+              {usingFallback ? 'Default library · open Settings to personalize' : 'Personalized for your mood'}
+            </p>
           </div>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-6">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
         {/* Banners */}
         {usingFallback && !isLoading && (
-          <div className="mb-4 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 flex items-center gap-2">
-            <span>⚠️</span>
-            <span>Showing default exercises. <a href="/settings" className="underline font-medium">Set your fitness level</a> for personalized recommendations.</span>
+          <div className="mb-3 rounded-lg border border-amber-200/80 bg-amber-50/90 px-3 py-2 text-xs text-amber-900 leading-snug sm:text-sm">
+            <span className="mr-1">⚠️</span>
+            Default exercises.{' '}
+            <a href="/settings" className="font-medium underline underline-offset-2">
+              Set fitness level
+            </a>{' '}
+            for AI picks.
           </div>
         )}
         {urlEmotion && !usingFallback && !isLoading && (
-          <div className="mb-4 px-4 py-2.5 bg-indigo-50 border border-indigo-200 rounded-lg text-sm text-indigo-700 flex items-center gap-2">
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-indigo-200/80 bg-indigo-50/90 px-3 py-2 text-xs text-indigo-900 sm:text-sm">
             <span>✨</span>
-            <span>Exercises tailored for your <strong className="capitalize">{urlEmotion}</strong> emotion from your last check-in.</span>
-            <a href="/exercises" className="ml-auto text-xs text-indigo-400 hover:underline">Clear</a>
+            <span>
+              Tailored for <strong className="capitalize">{urlEmotion}</strong> from your check-in.
+            </span>
+            <a href="/exercises" className="ml-auto shrink-0 text-[11px] font-medium text-indigo-600 hover:underline">
+              Clear
+            </a>
           </div>
         )}
 
-        {/* Filters row */}
-        <div className="flex flex-wrap items-center gap-2 mb-6">
+        {/* Filters — scroll on narrow screens */}
+        <div className="mb-4 flex flex-wrap items-center gap-1.5 sm:gap-2">
           {urlEmotion ? (
             <>
-              <span className="text-xs font-medium text-gray-500">Detected mood:</span>
-              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-black text-white border border-black shadow-sm">
+              <span className="text-[11px] font-medium text-neutral-500 sm:text-xs">Mood:</span>
+              <span className="inline-flex items-center gap-1 rounded-full border border-neutral-900 bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white shadow-sm">
                 <span>{EMOTION_OPTIONS.find(e => e.key === selectedEmotion)?.emoji}</span>
                 {EMOTION_OPTIONS.find(e => e.key === selectedEmotion)?.label}
               </span>
-              <span className="text-xs text-gray-400">— from your last check-in</span>
+              <span className="hidden text-[11px] text-neutral-400 sm:inline sm:text-xs">from check-in</span>
             </>
           ) : (
             <>
-              <span className="text-xs font-medium text-gray-500 mr-1">Choose mood:</span>
+              <span className="basis-full text-[11px] font-medium text-neutral-500 sm:basis-auto sm:text-xs">Mood</span>
               {EMOTION_OPTIONS.map((emo) => (
                 <button key={emo.key} onClick={() => setSelectedEmotion(emo.key)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
-                    selectedEmotion === emo.key ? 'bg-black text-white border-black shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-medium transition-all sm:px-3 sm:py-1.5 sm:text-sm ${
+                    selectedEmotion === emo.key ? 'border-neutral-900 bg-neutral-900 text-white shadow-sm' : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300'
                   }`}>
-                  <span>{emo.emoji}</span>{emo.label}
+                  <span>{emo.emoji}</span>
+                  {emo.label}
                 </button>
               ))}
             </>
           )}
-          <span className="mx-1 text-gray-300">|</span>
-          <span className="text-xs font-medium text-gray-500 mr-1">Category:</span>
+          <span className="hidden text-neutral-300 sm:inline" aria-hidden>
+            |
+          </span>
+          <span className="basis-full text-[11px] font-medium text-neutral-500 sm:basis-auto sm:text-xs">Category</span>
           {categories.map((cat) => (
             <button key={cat} onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
-                selectedCategory === cat ? 'bg-black text-white border-black shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+              className={`rounded-full border px-2 py-1 text-[11px] font-medium transition-all sm:px-3 sm:py-1.5 sm:text-sm ${
+                selectedCategory === cat ? 'border-neutral-900 bg-neutral-900 text-white shadow-sm' : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300'
               }`}>
               {cat}
             </button>
@@ -300,18 +301,20 @@ export default function ExercisesPage() {
 
         {/* Active preference context */}
         {userPrefs.fitness_level && (
-          <div className="flex items-center gap-2 mb-4 text-xs text-gray-500">
-            <span>Fitness level:</span>
-            <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium capitalize">{userPrefs.fitness_level}</span>
-            <span className="text-gray-400">· <a href="/settings" className="hover:underline">change in settings</a></span>
+          <div className="mb-3 flex flex-wrap items-center gap-1.5 text-[11px] text-neutral-500 sm:text-xs">
+            <span>Fitness</span>
+            <span className="rounded-full bg-orange-100 px-2 py-0.5 font-medium capitalize text-orange-800">{userPrefs.fitness_level}</span>
+            <a href="/settings" className="text-neutral-400 hover:text-neutral-700 hover:underline">
+              Edit
+            </a>
           </div>
         )}
 
-        {/* Main layout */}
-        <div className="grid lg:grid-cols-[1fr_280px] gap-6">
+        {/* Main layout — sidebar stacks below on mobile */}
+        <div className="grid gap-4 lg:grid-cols-[1fr_minmax(0,260px)] lg:gap-5">
 
           {/* Exercise grid */}
-          <div>
+          <div className="order-1 lg:order-none">
             {isLoading ? (
               <div className="flex flex-col items-center justify-center py-20">
                 <Loader2 className="w-7 h-7 animate-spin text-gray-300 mb-3" />
@@ -323,7 +326,7 @@ export default function ExercisesPage() {
                 <p className="text-sm">No exercises for this filter.</p>
               </div>
             ) : (
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-3">
                 {filteredExercises.map((exercise) => {
                   const isExpanded = expandedExercise === exercise.id;
                   const isCompleted = completedExercises.includes(exercise.id);
@@ -408,11 +411,11 @@ export default function ExercisesPage() {
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-4 sticky top-20 self-start">
+          <div className="order-2 space-y-3 lg:sticky lg:top-20 lg:order-none lg:self-start">
             {/* Progress card */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-4">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-                <Target className="w-3.5 h-3.5" /> Today&apos;s Progress
+            <div className="rounded-xl border border-neutral-200 bg-white p-3 sm:p-4">
+              <h3 className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                <Target className="h-3.5 w-3.5" /> Today
               </h3>
               <div className="space-y-3">
                 <div>
@@ -439,9 +442,9 @@ export default function ExercisesPage() {
             </div>
 
             {/* Stats card */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-4">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-                <CalendarIcon className="w-3.5 h-3.5" /> Library
+            <div className="rounded-xl border border-neutral-200 bg-white p-3 sm:p-4">
+              <h3 className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                <CalendarIcon className="h-3.5 w-3.5" /> Library
               </h3>
               <div className="space-y-2.5">
                 {[
@@ -459,8 +462,8 @@ export default function ExercisesPage() {
             </div>
 
             {/* Tips */}
-            <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
-              <h3 className="text-xs font-semibold text-blue-800 mb-2">💡 Tips</h3>
+            <div className="rounded-xl border border-sky-200/80 bg-sky-50/90 p-3 sm:p-4">
+              <h3 className="mb-2 text-xs font-semibold text-sky-900">💡 Tips</h3>
               <ul className="space-y-1.5 text-xs text-blue-700">
                 {['Start slow, build up gradually', 'Stay hydrated throughout', 'Rest when your body asks', 'Consistency beats intensity'].map(t => (
                   <li key={t} className="flex items-start gap-1.5"><span className="mt-0.5">•</span>{t}</li>

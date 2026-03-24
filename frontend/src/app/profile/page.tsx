@@ -104,7 +104,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Stats - Compact */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <div className="bg-white rounded-2xl border border-gray-200 p-3 text-center">
           <div className="text-2xl font-bold text-indigo-600">{user.total_entries || 0}</div>
           <p className="text-xs text-gray-500 mt-0.5">Entries</p>

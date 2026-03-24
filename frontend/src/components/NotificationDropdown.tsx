@@ -187,7 +187,7 @@ export default function NotificationDropdown() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+        <div className="fixed inset-x-0 top-16 mx-4 max-h-[calc(100vh-5rem)] flex flex-col sm:absolute sm:inset-x-auto sm:top-auto sm:mx-0 sm:right-0 sm:mt-2 sm:w-96 sm:max-h-[32rem] bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
             <h3 className="font-semibold text-lg">Notifications</h3>
@@ -212,7 +212,7 @@ export default function NotificationDropdown() {
           </div>
 
           {/* Notifications List */}
-          <div className="max-h-96 overflow-y-auto">
+          <div className="flex-1 min-h-0 overflow-y-auto">
             {isLoading ? (
               <div className="p-8 text-center text-gray-500">
                 Loading notifications...

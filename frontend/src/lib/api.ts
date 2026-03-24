@@ -1,4 +1,5 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8000';
+/** Base URL for the Django API (use your PC's LAN IP when testing from a phone). */
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8000';
 
 export type User = {
   id: number;
@@ -906,18 +907,23 @@ export async function apiGetNotifications(
   return res.json();
 }
 
+/** Used by polling; returns 0 when the API is unreachable (no throw — avoids noisy console / overlays). */
 export async function apiGetUnreadCount(accessToken: string): Promise<{ unread_count: number }> {
-  const res = await fetch(`${API_URL}/api/notifications/unread-count/`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  try {
+    const res = await fetch(`${API_URL}/api/notifications/unread-count/`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
 
-  if (!res.ok) {
-    throw new Error('Failed to load unread count.');
+    if (!res.ok) {
+      return { unread_count: 0 };
+    }
+
+    return res.json();
+  } catch {
+    return { unread_count: 0 };
   }
-
-  return res.json();
 }
 
 export async function apiMarkNotificationAsRead(

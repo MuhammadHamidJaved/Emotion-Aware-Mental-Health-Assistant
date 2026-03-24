@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Play, Pause, SkipForward, Volume2, Heart, Music, Clock, TrendingUp, RefreshCw, Loader2, ExternalLink, Settings } from 'lucide-react';
+import { Play, Pause, SkipForward, Volume2, Heart, Music, Clock, TrendingUp, Loader2, ExternalLink } from 'lucide-react';
 import { apiGetPersonalizedRecommendations, apiSendRecommendationFeedback, apiGetRecommendationSettings, type SpotifyTrack, type RecommendationSettings } from '@/lib/api';
 
 interface Track {
@@ -236,96 +236,102 @@ export default function MusicPage() {
   const accent = MOOD_ACCENT[selectedEmotion] || MOOD_ACCENT.calm;
 
   return (
-    <div className="min-h-screen bg-gray-50 text-black">
-      {/* Top bar */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
-              <Music className="w-4 h-4 text-white" />
+    <div className="min-h-[calc(100vh-4rem)] bg-neutral-50 text-black -mx-4 sm:-mx-6">
+      <div className="border-b border-neutral-200 bg-white px-4 sm:px-6 py-3.5">
+        <div className="mx-auto flex max-w-6xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 shadow-sm">
+              <Music className="h-4 w-4 text-white" />
             </div>
-            <div>
-              <h1 className="text-xl font-bold leading-none">Music Therapy</h1>
-              <p className="text-xs text-gray-500 mt-0.5">{usingFallback ? 'Default library' : 'Personalized for you'}</p>
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold leading-tight text-neutral-900">Music Therapy</h1>
+              <p className="mt-0.5 truncate text-xs text-neutral-500">
+                {usingFallback ? 'Default library · personalize in Settings' : 'Mood-matched tracks'}
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {playlistUrl && (
-              <a href={playlistUrl} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors border border-green-200">
-                <ExternalLink className="w-3 h-3" /> Open Playlist
-              </a>
-            )}
-            <a href="/settings" className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Personalization settings">
-              <Settings className="w-4 h-4 text-gray-500" />
+          {playlistUrl && (
+            <a
+              href={playlistUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 self-start rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 transition-colors hover:bg-emerald-100 sm:self-auto"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Open Spotify playlist
             </a>
-            <button onClick={() => fetchPersonalizedMusic(selectedEmotion)} disabled={isLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-xs font-medium disabled:opacity-50">
-              <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
-            </button>
-          </div>
+          )}
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-6">
+      <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 sm:py-5">
         {/* Banners */}
         {usingFallback && !isLoading && (
-          <div className="mb-4 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 flex items-center gap-2">
-            <span>⚠️</span>
-            <span>Using default playlist. <a href="/settings" className="underline font-medium">Set your preferences</a> for personalized music.</span>
+          <div className="mb-3 rounded-lg border border-amber-200/80 bg-amber-50/90 px-3 py-2 text-xs text-amber-900 leading-snug sm:text-sm">
+            <span className="mr-1">⚠️</span>
+            Default playlist.{' '}
+            <a href="/settings" className="font-medium underline underline-offset-2">
+              Set preferences
+            </a>{' '}
+            for personalized music.
           </div>
         )}
         {urlEmotionRaw && !usingFallback && !isLoading && (
-          <div className="mb-4 px-4 py-2.5 bg-indigo-50 border border-indigo-200 rounded-lg text-sm text-indigo-700 flex items-center gap-2">
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-indigo-200/80 bg-indigo-50/90 px-3 py-2 text-xs text-indigo-900 sm:text-sm">
             <span>✨</span>
-            <span>Personalized for your <strong className="capitalize">{urlEmotionRaw}</strong> emotion from your last check-in.</span>
-            <a href="/music" className="ml-auto text-xs text-indigo-400 hover:underline">Clear</a>
+            <span>
+              For <strong className="capitalize">{urlEmotionRaw}</strong> from your check-in.
+            </span>
+            <a href="/music" className="ml-auto shrink-0 text-[11px] font-medium text-indigo-600 hover:underline">
+              Clear
+            </a>
           </div>
         )}
 
-        {/* Mood indicator */}
         {urlEmotionRaw ? (
-          <div className="flex items-center gap-2 mb-6">
-            <span className="text-xs font-medium text-gray-500">Detected mood:</span>
-            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-black text-white border border-black shadow-sm">
-              <span>{activeEmotion?.emoji}</span>{activeEmotion?.label}
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-medium text-neutral-500 sm:text-xs">Mood</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-neutral-900 bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white shadow-sm">
+              <span>{activeEmotion?.emoji}</span>
+              {activeEmotion?.label}
             </span>
-            <span className="text-xs text-gray-400">— from your last check-in</span>
           </div>
         ) : (
-          <div className="flex items-center gap-2 flex-wrap mb-6">
-            <span className="text-xs font-medium text-gray-500 mr-1">Choose mood:</span>
+          <div className="mb-4 flex flex-wrap items-center gap-1.5">
+            <span className="basis-full text-[11px] font-medium text-neutral-500 sm:basis-auto sm:mr-1 sm:text-xs">Mood</span>
             {emotions.map((emo) => (
-              <button key={emo.key} onClick={() => setSelectedEmotion(emo.key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
+              <button
+                key={emo.key}
+                type="button"
+                onClick={() => setSelectedEmotion(emo.key)}
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-medium transition-all sm:px-3 sm:py-1.5 sm:text-sm ${
                   selectedEmotion === emo.key
-                    ? 'bg-black text-white border-black shadow-sm'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
-                }`}>
-                <span>{emo.emoji}</span>{emo.label}
+                    ? 'border-neutral-900 bg-neutral-900 text-white shadow-sm'
+                    : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300'
+                }`}
+              >
+                <span>{emo.emoji}</span>
+                <span className="max-w-[9rem] truncate sm:max-w-none">{emo.label}</span>
               </button>
             ))}
           </div>
         )}
 
-        {/* Main layout */}
-        <div className="grid lg:grid-cols-[1fr_300px] gap-6">
+        <div className="grid gap-4 lg:grid-cols-[1fr_minmax(0,280px)] lg:gap-5">
 
-          {/* Track list */}
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-            {/* Playlist header */}
-            <div className={`px-5 py-4 border-b border-gray-100 flex items-center justify-between`}>
-              <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 ${accent.bg} rounded-lg flex items-center justify-center`}>
-                  <Music className="w-4 h-4 text-white" />
+          <div className="order-1 overflow-hidden rounded-xl border border-neutral-200 bg-white lg:order-none">
+            <div className="flex items-center justify-between gap-2 border-b border-neutral-100 px-3 py-3 sm:px-4">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${accent.bg}`}>
+                  <Music className="h-4 w-4 text-white" />
                 </div>
-                <div>
-                  <h2 className="font-semibold text-sm">{activeEmotion?.label} Playlist</h2>
-                  <p className="text-xs text-gray-500">
+                <div className="min-w-0">
+                  <h2 className="truncate text-sm font-semibold text-neutral-900">{activeEmotion?.label} playlist</h2>
+                  <p className="truncate text-[11px] text-neutral-500 sm:text-xs">
                     {currentTracks.length} tracks
                     {userPrefs.favorite_artists && userPrefs.favorite_artists.length > 0 && (
-                      <span className="ml-2 text-purple-600 font-medium">
-                        · featuring {userPrefs.favorite_artists.join(', ')}
+                      <span className="text-purple-600 font-medium"> · {userPrefs.favorite_artists.slice(0, 2).join(', ')}
+                        {userPrefs.favorite_artists.length > 2 ? '…' : ''}
                       </span>
                     )}
                   </p>
@@ -334,24 +340,29 @@ export default function MusicPage() {
             </div>
 
             {isLoading ? (
-              <div className="flex flex-col items-center justify-center py-20">
-                <Loader2 className="w-7 h-7 animate-spin text-gray-300 mb-3" />
-                <p className="text-sm text-gray-400">Loading personalized tracks…</p>
+              <div className="flex flex-col items-center justify-center py-12 sm:py-16">
+                <Loader2 className="mb-2 h-6 w-6 animate-spin text-neutral-300" />
+                <p className="text-xs text-neutral-500 sm:text-sm">Loading tracks…</p>
               </div>
             ) : currentTracks.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-                <Music className="w-10 h-10 mb-3 text-gray-200" />
+              <div className="flex flex-col items-center justify-center py-12 text-neutral-400">
+                <Music className="mb-2 h-9 w-9 text-neutral-200" />
                 <p className="text-sm">No tracks for this mood.</p>
-                <button onClick={() => fetchPersonalizedMusic(selectedEmotion)}
-                  className="mt-3 text-xs text-black underline">Try again</button>
+                <button
+                  type="button"
+                  onClick={() => fetchPersonalizedMusic(selectedEmotion)}
+                  className="mt-2 text-xs font-medium text-neutral-900 underline underline-offset-2"
+                >
+                  Try again
+                </button>
               </div>
             ) : (
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-neutral-100">
                 {currentTracks.map((track, idx) => {
                   const isActive = currentTrack?.id === track.id;
                   return (
                     <div key={track.id}
-                      className={`flex items-center gap-3 px-5 py-3 group hover:bg-gray-50 transition-colors cursor-pointer ${isActive ? 'bg-gray-50' : ''}`}
+                      className={`group flex cursor-pointer items-center gap-2 px-3 py-2.5 transition-colors hover:bg-neutral-50 sm:gap-3 sm:px-4 sm:py-3 ${isActive ? 'bg-neutral-50' : ''}`}
                       onClick={() => handlePlayPause(track)}>
                       {/* Track number / play indicator */}
                       <div className="w-6 text-center flex-shrink-0">
@@ -401,10 +412,8 @@ export default function MusicPage() {
             )}
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-4">
-            {/* Now Playing card */}
-            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden sticky top-20">
+          <div className="order-2 space-y-3 lg:order-none lg:self-start">
+            <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white lg:sticky lg:top-20">
               {currentTrack ? (
                 <>
                   {/* Art */}
@@ -461,8 +470,8 @@ export default function MusicPage() {
             </div>
 
             {/* Stats card */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-4">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Session</h3>
+            <div className="rounded-xl border border-neutral-200 bg-white p-3 sm:p-4">
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Session</h3>
               <div className="space-y-2.5">
                 {[
                   { label: 'Saved', value: favorites.length },
@@ -478,8 +487,8 @@ export default function MusicPage() {
             </div>
 
             {/* Benefits */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-4">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Benefits</h3>
+            <div className="rounded-xl border border-neutral-200 bg-white p-3 sm:p-4">
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Benefits</h3>
               <div className="space-y-2.5">
                 {[
                   { icon: <TrendingUp className="w-3 h-3 text-green-600" />, bg: 'bg-green-100', label: 'Reduces Stress', sub: 'Lowers cortisol by 65%' },

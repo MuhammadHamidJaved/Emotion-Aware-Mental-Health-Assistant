@@ -101,8 +101,9 @@ class MeView(APIView):
 
         user = request.user
 
-        # Make a mutable copy of incoming data
-        data = request.data.copy()
+        # Build a plain dict from incoming data (avoids deepcopy issues with
+        # file handles that cannot be pickled).
+        data = {key: request.data[key] for key in request.data if key != "profile_picture"}
 
         # Handle optional profile picture upload
         profile_file = request.FILES.get("profile_picture")

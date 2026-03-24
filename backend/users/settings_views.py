@@ -85,7 +85,13 @@ def settings_profile(request):
             )
         
         try:
-            data = request.data.copy()
+            # Build a plain dict from request data to avoid deepcopy/pickle
+            # issues with multipart uploaded files.
+            data = {
+                key: request.data[key]
+                for key in request.data
+                if key != 'profile_picture'
+            }
             
             # Handle profile picture upload (if provided)
             if 'profile_picture' in request.FILES:

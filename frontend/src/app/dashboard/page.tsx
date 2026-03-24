@@ -175,28 +175,31 @@ export default function DashboardPage() {
 
   return (
     <ProtectedPage>
-      <div className="space-y-4 pt-6">
+      <div className="space-y-3 sm:space-y-4 pt-4 sm:pt-6">
         {/* Assistant Greeting Card - PRIMARY FOCUS */}
         {!isLoading && (
           <>
-            <div className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 overflow-hidden p-6">
-              <div className="flex items-start gap-4">
-                {/* Assistant Avatar */}
-                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg flex-shrink-0">
-                  <Brain className="w-7 h-7 text-white" />
+            <div className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 overflow-hidden p-4 sm:p-6">
+              {/* Icon + greeting on one row; body copy full-width so mobile has no empty column under the icon */}
+              <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg flex-shrink-0 ring-4 ring-white/60">
+                  <Brain className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
                 </div>
-                
-                {/* Greeting Content */}
-                <div className="flex-1">
-                  <h2 className="text-xl font-bold mb-1">
-                    {getGreeting()}{userName ? `, ${userName.split(' ')[0]}` : ''}! 👋
-                  </h2>
-                  <p className="text-neutral-700 mb-4">
-                    I'm your emotion-aware assistant. I provide emotional support and personalized recommendations to help you understand and manage your feelings. <span className="text-xs italic text-neutral-600">(Note: I'm not a replacement for professional therapists or psychiatrists.)</span>
-                  </p>
+                <h2 className="text-lg sm:text-xl font-bold leading-tight min-w-0 flex-1">
+                  {getGreeting()}{userName ? `, ${userName.split(' ')[0]}` : ''}! 👋
+                </h2>
+              </div>
 
+              <p className="text-sm sm:text-base text-neutral-700 mb-4 sm:mb-5 leading-relaxed">
+                I'm your emotion-aware assistant. I provide emotional support and personalized recommendations to help you understand and manage your feelings.{' '}
+                <span className="text-xs italic text-neutral-600 block sm:inline mt-1 sm:mt-0">
+                  (Note: I'm not a replacement for professional therapists or psychiatrists.)
+                </span>
+              </p>
+
+              <div className="space-y-4">
                   {/* Check-In Prompt - Always visible */}
-                  <div className="mb-4 p-3 bg-white/80 rounded-lg border border-indigo-200">
+                  <div className="p-3 sm:p-4 bg-white/80 rounded-xl border border-indigo-200/80 shadow-sm">
                     <p className="text-sm font-medium text-neutral-800 mb-2">
                       💬 How are you feeling today?
                     </p>
@@ -227,7 +230,7 @@ export default function DashboardPage() {
                   </div>
 
                   {/* How can I help you section */}
-                  <div className="mt-4">
+                  <div>
                     <p className="text-sm font-medium text-neutral-800 mb-3 flex items-center gap-2">
                       💡 How can I help you today?
                     </p>
@@ -252,12 +255,13 @@ export default function DashboardPage() {
                       </Link>
                     </div>
                   </div>
-                </div>
               </div>
-          </div>
+            </div>
+            {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
               {error}
             </div>
+            )}
           </>
         )}
 
@@ -278,8 +282,8 @@ export default function DashboardPage() {
         {/* Stats Grid - Compact - Moved to Secondary Position */}
         {!isLoading && (
           <>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="rounded-2xl border border-gray-200 bg-white p-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
+          <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4">
             <div className="flex items-center justify-between mb-2">
               <Flame className="w-5 h-5 text-orange-500" />
               <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded-full font-medium">Active</span>
@@ -288,7 +292,7 @@ export default function DashboardPage() {
             <p className="text-xs text-neutral-500">Day Streak</p>
           </div>
 
-          <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4">
             <div className="flex items-center justify-between mb-2">
               <Calendar className="w-5 h-5 text-purple-500" />
             </div>
@@ -296,7 +300,7 @@ export default function DashboardPage() {
             <p className="text-xs text-neutral-500">Total Entries</p>
           </div>
 
-          <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4">
             <div className="flex items-center justify-between mb-2">
               <Sparkles className="w-5 h-5 text-pink-500" />
             </div>
@@ -304,7 +308,7 @@ export default function DashboardPage() {
             <p className="text-xs text-neutral-500">Mood: {dominantEmotion}</p>
           </div>
 
-          <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4">
             <div className="flex items-center justify-between mb-2">
               <Brain className="w-5 h-5 text-blue-500" />
             </div>
@@ -353,14 +357,14 @@ export default function DashboardPage() {
         )}
 
         {/* Charts Row - Compact - Moved to Secondary Position */}
-        <div className="grid md:grid-cols-2 gap-3">
+        <div className="grid md:grid-cols-2 gap-2 sm:gap-3">
           <div className="bg-white rounded-2xl border border-gray-200">
             <div className="flex items-center gap-2 px-4 pt-4 pb-2">
               <TrendingUp className="w-4 h-4 text-indigo-600" />
               <span className="text-sm font-semibold">Mood Trend (Last 7 Days)</span>
             </div>
             <div className="px-2 pb-2">
-              <ResponsiveContainer width="100%" height={180}>
+              <ResponsiveContainer width="100%" height={160}>
                 <LineChart data={moodChartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="date" tick={{ fontSize: 11 }} />
@@ -377,7 +381,7 @@ export default function DashboardPage() {
               <span className="text-sm font-semibold">Emotion Distribution</span>
             </div>
             <div className="px-2 pb-2">
-              <ResponsiveContainer width="100%" height={180}>
+              <ResponsiveContainer width="100%" height={160}>
                 {emotionChartData.length > 0 ? (
                   <PieChart>
                     <Pie 
@@ -475,7 +479,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Personalized Recommendations - Enhanced */}
-        <div className="rounded-2xl border border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 p-4">
+        <div className="rounded-2xl border border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 p-3 sm:p-4">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-purple-600" />
@@ -490,7 +494,7 @@ export default function DashboardPage() {
           <p className="text-xs text-neutral-500 mb-3">
             Based on your recent emotions, here's what might help:
           </p>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {personalizedRecs.map((rec) => {
               const Icon = rec.icon
               return (

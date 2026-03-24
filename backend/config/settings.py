@@ -30,7 +30,12 @@ SECRET_KEY = 'django-insecure-ajznvh!hvi)c9+p%0mp*f8q$e-477b=_3v$yzl$m!^^)-8uj4#
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+# Comma-separated hosts, or * alone (dev only — e.g. HTTPS tunnels like ngrok change hostname each run).
+_allowed_raw = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').strip()
+if _allowed_raw == '*':
+    ALLOWED_HOSTS = ['*']
+else:
+    ALLOWED_HOSTS = [h.strip() for h in _allowed_raw.split(',') if h.strip()]
 
 
 # Application definition
@@ -207,6 +212,21 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
+# Optional: e.g. http://192.168.1.10:3000 (same origin you open on the phone)
+_cors_extra = config('CORS_ALLOWED_ORIGINS_EXTRA', default='')
+if _cors_extra.strip():
+    CORS_ALLOWED_ORIGINS += [o.strip() for o in _cors_extra.split(',') if o.strip()]
+
+# In DEBUG, allow typical LAN dev URLs and HTTPS tunnels (ngrok / Cloudflare) for mobile camera testing
+if DEBUG:
+    CORS_ALLOWED_ORIGIN_REGEXES = [
+        r'^http://(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?$',
+        r'^https://[a-zA-Z0-9-]+\.ngrok-free\.app$',
+        r'^https://[a-zA-Z0-9-]+\.ngrok\.io$',
+        r'^https://[a-zA-Z0-9-]+\.ngrok-free\.dev$',
+        r'^https://[a-zA-Z0-9-]+\.trycloudflare\.com$',
+        r'^https://[a-zA-Z0-9-]+\.loca\.lt$',
+    ]
 
 CORS_ALLOW_CREDENTIALS = True
 

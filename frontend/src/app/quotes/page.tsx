@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Quote, Heart, Share2, RefreshCw, Sparkles, TrendingUp, Loader2, Settings } from 'lucide-react';
+import { Quote, Heart, Share2, Shuffle, Sparkles, TrendingUp, Loader2 } from 'lucide-react';
 import { apiGetPersonalizedRecommendations, apiSendRecommendationFeedback, apiGetRecommendationSettings, type RecommendationSettings } from '@/lib/api';
 
 interface QuoteData {
@@ -207,92 +207,100 @@ export default function QuotesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 text-black">
-      {/* Top bar */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-gradient-to-br from-pink-500 to-purple-500 rounded-xl flex items-center justify-center">
-              <Quote className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold leading-none">Daily Quotes</h1>
-              <p className="text-xs text-gray-500 mt-0.5">{usingFallback ? 'Default library' : 'Personalized for you'}</p>
-            </div>
+    <div className="min-h-[calc(100vh-4rem)] bg-neutral-50 text-black -mx-4 sm:-mx-6">
+      <div className="border-b border-neutral-200 bg-white px-4 sm:px-6 py-3.5">
+        <div className="mx-auto flex max-w-6xl items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-purple-500 shadow-sm">
+            <Quote className="h-4 w-4 text-white" />
           </div>
-          <div className="flex items-center gap-2">
-            <a href="/settings" className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Personalization settings">
-              <Settings className="w-4 h-4 text-gray-500" />
-            </a>
-            <button onClick={() => fetchPersonalizedQuotes(selectedEmotion)} disabled={isLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-xs font-medium disabled:opacity-50">
-              <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
-            </button>
+          <div className="min-w-0">
+            <h1 className="text-lg font-bold leading-tight text-neutral-900">Daily Quotes</h1>
+            <p className="mt-0.5 truncate text-xs text-neutral-500">
+              {usingFallback ? 'Curated library · personalize in Settings' : 'Matched to your mood'}
+            </p>
           </div>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-6">
+      <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 sm:py-5">
         {/* Banners */}
         {usingFallback && !isLoading && (
-          <div className="mb-4 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 flex items-center gap-2">
-            <span>⚠️</span>
-            <span>Showing default quotes. <a href="/settings" className="underline font-medium">Set your preferences</a> for personalized content.</span>
+          <div className="mb-3 rounded-lg border border-amber-200/80 bg-amber-50/90 px-3 py-2 text-xs text-amber-900 leading-snug sm:text-sm">
+            <span className="mr-1">⚠️</span>
+            Default quotes.{' '}
+            <a href="/settings" className="font-medium underline underline-offset-2">
+              Set preferences
+            </a>{' '}
+            for personalization.
           </div>
         )}
         {urlEmotion && !usingFallback && !isLoading && (
-          <div className="mb-4 px-4 py-2.5 bg-indigo-50 border border-indigo-200 rounded-lg text-sm text-indigo-700 flex items-center gap-2">
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-indigo-200/80 bg-indigo-50/90 px-3 py-2 text-xs text-indigo-900 sm:text-sm">
             <span>✨</span>
-            <span>Quotes tailored for your <strong className="capitalize">{urlEmotion}</strong> emotion from your last check-in.</span>
-            <a href="/quotes" className="ml-auto text-xs text-indigo-400 hover:underline">Clear</a>
+            <span>
+              For <strong className="capitalize">{urlEmotion}</strong> from your check-in.
+            </span>
+            <a href="/quotes" className="ml-auto shrink-0 text-[11px] font-medium text-indigo-600 hover:underline">
+              Clear
+            </a>
           </div>
         )}
 
-        {/* Mood indicator */}
         {urlEmotion ? (
-          <div className="flex items-center gap-2 mb-6">
-            <span className="text-xs font-medium text-gray-500">Detected mood:</span>
-            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-black text-white border border-black shadow-sm">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-medium text-neutral-500 sm:text-xs">Mood</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-neutral-900 bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white shadow-sm">
               <span>{EMOTION_OPTIONS.find(e => e.key === selectedEmotion)?.emoji}</span>
               {EMOTION_OPTIONS.find(e => e.key === selectedEmotion)?.label}
             </span>
-            <span className="text-xs text-gray-400">— from your last check-in</span>
           </div>
         ) : (
-          <div className="flex flex-wrap items-center gap-2 mb-6">
-            <span className="text-xs font-medium text-gray-500 mr-1">Choose mood:</span>
+          <div className="mb-4 flex flex-wrap items-center gap-1.5">
+            <span className="basis-full text-[11px] font-medium text-neutral-500 sm:basis-auto sm:text-xs">Mood</span>
             {EMOTION_OPTIONS.map((emo) => (
-              <button key={emo.key} onClick={() => setSelectedEmotion(emo.key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
-                  selectedEmotion === emo.key ? 'bg-black text-white border-black shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
-                }`}>
-                <span>{emo.emoji}</span>{emo.label}
+              <button
+                key={emo.key}
+                type="button"
+                onClick={() => setSelectedEmotion(emo.key)}
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-medium transition-all sm:px-3 sm:py-1.5 sm:text-sm ${
+                  selectedEmotion === emo.key
+                    ? 'border-neutral-900 bg-neutral-900 text-white shadow-sm'
+                    : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300'
+                }`}
+              >
+                <span>{emo.emoji}</span>
+                {emo.label}
               </button>
             ))}
           </div>
         )}
 
-        {/* Main layout */}
-        <div className="grid lg:grid-cols-[1fr_260px] gap-6">
-          <div className="space-y-5">
+        <div className="grid gap-4 lg:grid-cols-[1fr_minmax(0,240px)] lg:gap-5">
+          <div className="order-1 space-y-4 lg:order-none">
             {/* Featured Quote Hero */}
-            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-              <div className="p-6 bg-gradient-to-br from-gray-900 to-gray-800 text-white relative overflow-hidden">
+            <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+              <div className="relative overflow-hidden bg-gradient-to-br from-neutral-900 to-neutral-800 p-4 text-white sm:p-6">
                 <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
                 <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
                 <div className="relative">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-yellow-400" />
-                      <span className="text-xs font-semibold text-gray-300 uppercase tracking-wide">
-                        {apiQuotes.length > 0 ? 'Personalized Quote' : 'Quote of the Day'}
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Sparkles className="h-4 w-4 shrink-0 text-amber-300" />
+                      <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-neutral-300 sm:text-xs">
+                        {apiQuotes.length > 0 ? 'Personalized' : 'Featured'}
                       </span>
                     </div>
-                    <button onClick={getRandomQuote} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors" title="Random quote">
-                      <RefreshCw className="w-4 h-4 text-gray-300" />
+                    <button
+                      type="button"
+                      onClick={getRandomQuote}
+                      className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-medium text-neutral-300 transition-colors hover:bg-white/10"
+                      title="Shuffle quote"
+                    >
+                      <Shuffle className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Shuffle</span>
                     </button>
                   </div>
-                  <blockquote className="text-2xl font-serif leading-relaxed mb-5 text-white/95">
+                  <blockquote className="mb-4 font-serif text-lg leading-relaxed text-white/95 sm:text-2xl">
                     &ldquo;{dailyQuote.text}&rdquo;
                   </blockquote>
                   <div className="flex items-center justify-between">
@@ -314,24 +322,30 @@ export default function QuotesPage() {
 
             {/* Category filter + quote grid */}
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex flex-wrap gap-1.5">
+              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-wrap gap-1">
                   {categories.map((cat) => (
-                    <button key={cat} onClick={() => setSelectedCategory(cat)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
-                        selectedCategory === cat ? 'bg-black text-white border-black' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
-                      }`}>
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`rounded-full border px-2 py-1 text-[11px] font-medium transition-all sm:px-3 sm:py-1.5 sm:text-xs ${
+                        selectedCategory === cat
+                          ? 'border-neutral-900 bg-neutral-900 text-white'
+                          : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300'
+                      }`}
+                    >
                       {cat}
                     </button>
                   ))}
                 </div>
-                <span className="text-xs text-gray-400 flex-shrink-0 ml-2">{filteredQuotes.length} quotes</span>
+                <span className="text-[11px] text-neutral-400 sm:text-xs">{filteredQuotes.length} quotes</span>
               </div>
 
               {isLoading ? (
-                <div className="flex flex-col items-center justify-center py-16">
-                  <Loader2 className="w-7 h-7 animate-spin text-gray-300 mb-3" />
-                  <p className="text-sm text-gray-400">Loading personalized quotes…</p>
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader2 className="mb-2 h-6 w-6 animate-spin text-neutral-300" />
+                  <p className="text-xs text-neutral-500 sm:text-sm">Loading quotes…</p>
                 </div>
               ) : filteredQuotes.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-gray-400">
@@ -339,12 +353,12 @@ export default function QuotesPage() {
                   <p className="text-sm">No quotes for this filter.</p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {filteredQuotes.map((quote) => {
                     const isFav = favorites.includes(quote.id);
                     return (
                       <div key={quote.id}
-                        className={`bg-white rounded-xl border p-4 hover:shadow-sm transition-shadow ${quote.id.startsWith('api-') ? 'border-indigo-200' : 'border-gray-200'}`}>
+                        className={`rounded-xl border p-3 transition-shadow hover:shadow-sm sm:p-4 ${quote.id.startsWith('api-') ? 'border-indigo-200 bg-white' : 'border-neutral-200 bg-white'}`}>
                         <div className="flex gap-3">
                           <Quote className="w-5 h-5 text-gray-200 flex-shrink-0 mt-0.5" />
                           <div className="flex-1 min-w-0">
@@ -378,10 +392,9 @@ export default function QuotesPage() {
             </div>
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-4 sticky top-20 self-start">
+          <div className="order-2 space-y-3 lg:sticky lg:top-20 lg:order-none lg:self-start">
             {/* Saved */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-4 text-center">
+            <div className="rounded-xl border border-neutral-200 bg-white p-4 text-center">
               <Heart className="w-5 h-5 text-red-400 mx-auto mb-1" />
               <p className="text-3xl font-bold">{favorites.length}</p>
               <p className="text-xs text-gray-500 mt-0.5">Saved quotes</p>
@@ -393,9 +406,9 @@ export default function QuotesPage() {
             </div>
 
             {/* Source stats */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-4">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-                <TrendingUp className="w-3.5 h-3.5" /> Library
+            <div className="rounded-xl border border-neutral-200 bg-white p-3 sm:p-4">
+              <h3 className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                <TrendingUp className="h-3.5 w-3.5" /> Library
               </h3>
               <div className="space-y-2.5">
                 {[
@@ -413,8 +426,8 @@ export default function QuotesPage() {
             </div>
 
             {/* Categories breakdown */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-4">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Categories</h3>
+            <div className="rounded-xl border border-neutral-200 bg-white p-3 sm:p-4">
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Categories</h3>
               <div className="space-y-2">
                 {categories.filter(c => c !== 'All').map((cat) => {
                   const count = allQuotes.filter(q => q.category === cat).length;
@@ -433,8 +446,8 @@ export default function QuotesPage() {
             </div>
 
             {/* Daily reminder */}
-            <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4">
-              <h3 className="text-xs font-semibold text-purple-800 mb-2">💜 Daily Reminder</h3>
+            <div className="rounded-xl border border-violet-200/80 bg-violet-50/90 p-3 sm:p-4">
+              <h3 className="mb-1.5 text-xs font-semibold text-violet-900">💜 Reminder</h3>
               <p className="text-xs text-purple-700 mb-3 leading-relaxed">Enable notifications to start each morning with an inspiring quote.</p>
               <button className="w-full px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-xs font-medium">
                 Enable Notifications

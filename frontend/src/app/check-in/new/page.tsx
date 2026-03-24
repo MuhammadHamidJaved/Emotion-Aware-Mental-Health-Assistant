@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Brain, ArrowLeft, Save, Loader2, Zap, Type, Mic, Video, Sparkles, AlertCircle } from 'lucide-react'
+import { Brain, Save, Loader2, Zap, Type, Mic, Video, Sparkles, AlertCircle, Clock, PenLine } from 'lucide-react'
 import { useAuth } from '@/contexts/auth-context'
+import { API_URL } from '@/lib/api'
+import PageHeading from '@/components/PageHeading'
 
 const EMOTION_COLORS: Record<string, string> = {
   happy: '#FCD34D', sad: '#6366F1', angry: '#EF4444', anxious: '#EC4899',
@@ -14,12 +16,11 @@ const EMOTION_COLORS: Record<string, string> = {
 }
 
 export default function NewCheckInPage() {
-  console.log('[COMPONENT] NewCheckInPage rendering')
   const router = useRouter()
   const searchParams = useSearchParams()
   const { getAccessToken } = useAuth()
   const entryType = searchParams.get('type') || 'text'
-  
+
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [tags, setTags] = useState<string[]>([])
@@ -31,7 +32,7 @@ export default function NewCheckInPage() {
   const [recordingDuration, setRecordingDuration] = useState(0)
   const [showRecommendations, setShowRecommendations] = useState(false)
   const [isPredicting, setIsPredicting] = useState(false) // Track if prediction is active
-  
+
   // Webcam and video states
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -40,8 +41,40 @@ export default function NewCheckInPage() {
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const isPredictingRef = useRef<boolean>(false) // Use ref to track prediction state in intervals
   const [cameraError, setCameraError] = useState<string | null>(null)
-  const [finalEmotion, setFinalEmotion] = useState<any>(null) // Store final emotion for saving
-  const [recommendations, setRecommendations] = useState<any>(null) // Store recommendations from microservice
+  const [finalEmotion, setFinalEmotion] = useState<any>(null)
+  const [recommendations, setRecommendations] = useState<any>(null)
+  const [emotionHistory, setEmotionHistory] = useState<Array<{
+    emotion: string
+    confidence: string
+    predictions: any[]
+    timestamp: number
+    processingTime: number
+  }>>([])
+  const detectionActiveRef = useRef(false)
+  const recordingStartRef = useRef(0)
+
+  /** Camera/mic APIs require a secure context (HTTPS or localhost). Plain http:// + LAN IP is blocked on mobile Chrome. */
+  const [cameraGate, setCameraGate] = useState<'pending' | 'ok' | 'needs_https' | 'no_api'>('pending')
+
+  useEffect(() => {
+    if (entryType !== 'video') {
+      setCameraGate('ok')
+      return
+    }
+    if (typeof window === 'undefined') return
+    if (!window.isSecureContext) {
+      setCameraGate('needs_https')
+      return
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraGate('no_api')
+      return
+    }
+    setCameraGate('ok')
+  }, [entryType])
+
+  const HTTPS_CAMERA_HELP =
+    'Video needs a secure page (HTTPS) or localhost. Opening this site as http:// on your Wi‑Fi IP blocks the camera on phones. Options: use an HTTPS tunnel (ngrok, Cloudflare Tunnel), serve Next.js over HTTPS in dev (mkcert), or test video on a desktop browser.'
 
   const detectEmotion = async (text: string) => {
     // Minimum text length for better accuracy (microservice accepts 1 char, but we use 3 for better results)
@@ -51,16 +84,16 @@ export default function NewCheckInPage() {
     }
 
     setIsAnalyzing(true)
-    
+
     try {
       // Get access token from auth context
       const token = getAccessToken()
       if (!token) {
         throw new Error('Authentication required. Please log in again.')
       }
-      
+
       // Call Django backend which will call the text emotion microservice
-      const response = await fetch('http://localhost:8000/api/assistant/emotion/detect/text/', {
+      const response = await fetch(`${API_URL}/api/assistant/emotion/detect/text/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -70,7 +103,7 @@ export default function NewCheckInPage() {
           text: text
         })
       })
-      
+
       if (!response.ok) {
         if (response.status === 401) {
           throw new Error('Authentication required. Please log in again.')
@@ -78,20 +111,20 @@ export default function NewCheckInPage() {
         const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.error || errorData.message || 'Failed to detect emotion')
       }
-      
+
       const data = await response.json()
-      
+
       if (data.success) {
         // Map microservice emotion to our emotion format
         const predictedEmotion = data.predicted_emotion.toLowerCase()
         const confidence = (data.confidence * 100).toFixed(1)
-        
+
         // Convert all_scores to predictions array
         const predictions = Object.entries(data.all_scores || {}).map(([emotion, score]: [string, any]) => ({
           emotion: emotion.toLowerCase(),
           confidence: (score * 100).toFixed(1)
         })).sort((a: any, b: any) => parseFloat(b.confidence) - parseFloat(a.confidence))
-        
+
         const emotionData = {
           dominant: predictedEmotion,
           confidence: confidence,
@@ -100,11 +133,11 @@ export default function NewCheckInPage() {
           allScores: data.all_scores,
           top3: data.top_3
         }
-        
+
         console.log('✅ Updating emotion in real-time:', emotionData.dominant, emotionData.confidence + '%')
         setLiveEmotion(emotionData)
         setFinalEmotion(emotionData) // Store for saving (always update with latest)
-        
+
         // Store recommendations if available
         if (data.recommendations) {
           console.log('Received recommendations:', data.recommendations);
@@ -141,30 +174,21 @@ export default function NewCheckInPage() {
     return () => clearTimeout(timer)
   }, [content, entryType])
 
-  // Debug: Log when liveEmotion changes
-  useEffect(() => {
-    if (liveEmotion) {
-      console.log('🎭 UI Updated - Now showing:', liveEmotion.dominant, liveEmotion.confidence + '%')
-    } else {
-      console.log('🎭 UI Updated - Waiting for input')
-    }
-  }, [liveEmotion])
-
   const handleSave = async () => {
     if (!content.trim() && entryType === 'text') return
     if (entryType === 'video' && !finalEmotion) {
       alert('Please record a video to detect your emotion first.')
       return
     }
-    
+
     setIsSaving(true)
-    
+
     try {
       // Stop webcam if recording
       if (isRecording) {
         stopWebcam()
       }
-      
+
       // Prepare entry data
       const entryData: any = {
         entry_type: entryType,
@@ -173,29 +197,32 @@ export default function NewCheckInPage() {
         is_draft: false,
         entry_date: new Date().toISOString()
       }
-      
+
       if (entryType === 'text') {
         entryData.text_content = content.trim()
       } else if (entryType === 'video') {
         entryData.transcription = content.trim() || 'Video entry'
         entryData.duration = recordingDuration
       }
-      
-      // Add emotion data if available
-      if (liveEmotion || finalEmotion) {
+
+      // Use session-dominant emotion when history is available (more representative than last frame)
+      if (entryType === 'video' && emotionHistory.length >= 2 && sessionSummary) {
+        entryData.emotion = sessionSummary.dominant
+        entryData.emotion_confidence = parseFloat(sessionSummary.avgConfidence) / 100
+      } else if (liveEmotion || finalEmotion) {
         const emotionData = finalEmotion || liveEmotion
         entryData.emotion = emotionData.dominant
         entryData.emotion_confidence = parseFloat(emotionData.confidence) / 100
       }
-      
+
       // Get access token from auth context
       const token = getAccessToken()
       if (!token) {
         throw new Error('Authentication required. Please log in again.')
       }
-      
+
       // Save to backend
-      const response = await fetch('http://localhost:8000/api/assistant/entries/', {
+      const response = await fetch(`${API_URL}/api/assistant/entries/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -203,7 +230,7 @@ export default function NewCheckInPage() {
         },
         body: JSON.stringify(entryData)
       })
-      
+
       if (!response.ok) {
         if (response.status === 401) {
           throw new Error('Authentication required. Please log in again.')
@@ -211,10 +238,10 @@ export default function NewCheckInPage() {
         const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.error || errorData.message || errorData.detail || 'Failed to save entry')
       }
-      
+
       const savedEntry = await response.json()
       console.log('Entry saved:', savedEntry)
-      
+
       // Show recommendations modal
       setShowRecommendations(true)
     } catch (error: any) {
@@ -237,21 +264,21 @@ export default function NewCheckInPage() {
   const captureFrame = (): string | null => {
     const video = videoRef.current
     const canvas = canvasRef.current
-    
+
     if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
       return null
     }
-    
+
     const ctx = canvas.getContext('2d')
     if (!ctx) return null
-    
+
     // Set canvas dimensions to match video
     canvas.width = video.videoWidth
     canvas.height = video.videoHeight
-    
+
     // Draw video frame to canvas
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-    
+
     // Convert to base64
     return canvas.toDataURL('image/jpeg', 0.8).split(',')[1] // Remove data:image/jpeg;base64, prefix
   }
@@ -262,18 +289,18 @@ export default function NewCheckInPage() {
     if (!isPredictingRef.current) {
       return
     }
-    
+
     try {
       setIsAnalyzing(true)
-      
+
       // Get access token from auth context
       const token = getAccessToken()
       if (!token) {
         throw new Error('Authentication required. Please log in again.')
       }
-      
+
       // Call Django backend which will call the 7-class emotion microservice
-      const response = await fetch('http://localhost:8000/api/assistant/emotion/detect/7class/', {
+      const response = await fetch(`${API_URL}/api/assistant/emotion/detect/7class/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -283,7 +310,7 @@ export default function NewCheckInPage() {
           image_data: imageDataBase64
         })
       })
-      
+
       if (!response.ok) {
         if (response.status === 401) {
           throw new Error('Authentication required. Please log in again.')
@@ -297,22 +324,21 @@ export default function NewCheckInPage() {
         })
         throw new Error(errorMessage)
       }
-      
+
       const data = await response.json()
-      console.log('Emotion detection API response:', data)
-      
+
       // Check for success (handle both boolean true and string "true")
       if (data.success === true || data.success === 'true') {
         // Map microservice emotion to our emotion format
         const predictedEmotion = (data.predicted_emotion || '').toLowerCase()
         const confidence = data.confidence ? (data.confidence * 100).toFixed(1) : '0.0'
-        
+
         // Convert all_scores to predictions array
         const predictions = Object.entries(data.all_scores || {}).map(([emotion, score]: [string, any]) => ({
           emotion: emotion.toLowerCase(),
           confidence: (score * 100).toFixed(1)
         })).sort((a: any, b: any) => parseFloat(b.confidence) - parseFloat(a.confidence))
-        
+
         const emotionData = {
           dominant: predictedEmotion,
           confidence: confidence,
@@ -321,43 +347,38 @@ export default function NewCheckInPage() {
           allScores: data.all_scores,
           top3: data.top_3
         }
-        
-        console.log('✅ Updating emotion in real-time:', emotionData.dominant, emotionData.confidence + '%')
-        console.log('[STATE UPDATE] Calling setLiveEmotion with:', emotionData)
-        console.log('[STATE UPDATE] Current liveEmotion before setState:', liveEmotion)
+
         setLiveEmotion(emotionData)
-        setFinalEmotion(emotionData) // Store for saving (always update with latest)
-        
-        // Force a re-render by also updating a dummy state if needed
-        console.log('[STATE UPDATE] setLiveEmotion called, React should re-render now')
-        
+        setFinalEmotion(emotionData)
+        setEmotionHistory(prev => [...prev, {
+          emotion: predictedEmotion,
+          confidence,
+          predictions: predictions.slice(0, 5),
+          timestamp: Date.now(),
+          processingTime: data.processing_time_ms || 0
+        }])
+
         // Store recommendations if available (only update if we have new ones)
         if (data.recommendations) {
-          console.log('Received recommendations:', data.recommendations);
-          console.log('Music data:', data.recommendations.music);
           setRecommendations(data.recommendations)
-          // Also store in localStorage for recommendations page
           localStorage.setItem('lastRecommendations', JSON.stringify({
             emotion: predictedEmotion,
             confidence: confidence,
             recommendations: data.recommendations,
             timestamp: new Date().toISOString()
           }))
-        } else {
-          console.warn('No recommendations in response:', data);
         }
       } else {
-        console.warn('Emotion detection response did not have success=true:', data)
         // Try to extract emotion data even if success is not explicitly true
         if (data.predicted_emotion) {
           const predictedEmotion = (data.predicted_emotion || '').toLowerCase()
           const confidence = data.confidence ? (data.confidence * 100).toFixed(1) : '0.0'
-          
+
           const predictions = Object.entries(data.all_scores || {}).map(([emotion, score]: [string, any]) => ({
             emotion: emotion.toLowerCase(),
             confidence: (score * 100).toFixed(1)
           })).sort((a: any, b: any) => parseFloat(b.confidence) - parseFloat(a.confidence))
-          
+
           const emotionData = {
             dominant: predictedEmotion,
             confidence: confidence,
@@ -366,20 +387,20 @@ export default function NewCheckInPage() {
             allScores: data.all_scores,
             top3: data.top_3
           }
-          
-          console.log('✅ Updating emotion in real-time (fallback):', emotionData.dominant, emotionData.confidence + '%')
+
           setLiveEmotion(emotionData)
           setFinalEmotion(emotionData)
+          setEmotionHistory(prev => [...prev, {
+            emotion: predictedEmotion,
+            confidence,
+            predictions: predictions.slice(0, 5),
+            timestamp: Date.now(),
+            processingTime: data.processing_time_ms || 0
+          }])
         }
       }
     } catch (error: any) {
-      console.error('Error detecting emotion:', error)
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        isPredicting: isPredictingRef.current
-      })
-      // Don't show error if prediction was stopped
+      console.error('Error detecting emotion:', error.message)
       if (isPredictingRef.current) {
         setCameraError(error.message || 'Failed to detect emotion. Please try again.')
       }
@@ -388,52 +409,71 @@ export default function NewCheckInPage() {
     }
   }
 
-  // Start webcam
+  // Non-overlapping detection loop: waits for each call to finish before scheduling the next
+  const runNextDetection = async () => {
+    if (!detectionActiveRef.current || !isPredictingRef.current) return
+
+    const frame = captureFrame()
+    if (frame) {
+      await detectEmotionFromFrame(frame)
+    }
+
+    if (detectionActiveRef.current && isPredictingRef.current) {
+      setTimeout(runNextDetection, 500)
+    }
+  }
+
   const startWebcam = async () => {
     try {
       setCameraError(null)
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
+
+      if (typeof window !== 'undefined' && !window.isSecureContext) {
+        setCameraError(HTTPS_CAMERA_HELP)
+        return
+      }
+      const md = typeof navigator !== 'undefined' ? navigator.mediaDevices : undefined
+      if (!md?.getUserMedia) {
+        setCameraError(
+          'Camera API is not available. On mobile, use HTTPS or localhost; otherwise update your browser.'
+        )
+        return
+      }
+
+      const stream = await md.getUserMedia({
+        video: {
           width: { ideal: 640 },
           height: { ideal: 480 },
           facingMode: 'user'
         },
         audio: false
       })
-      
+
       streamRef.current = stream
-      
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         videoRef.current.play()
       }
-      
+
       setIsRecording(true)
       setRecordingDuration(0)
       setIsPredicting(true) // Start prediction automatically when recording starts
       isPredictingRef.current = true // Update ref as well
-      
-      // Start capturing frames every 1.5 seconds for more frequent updates
-      // Wait a bit for video to be ready before starting capture
+
+      recordingStartRef.current = Date.now()
+      setEmotionHistory([])
+
+      // Start continuous detection loop after brief init delay
       setTimeout(() => {
-        captureIntervalRef.current = setInterval(() => {
-          const frame = captureFrame()
-          if (frame && isPredictingRef.current) {
-            console.log('Capturing frame for emotion detection, isPredicting:', isPredictingRef.current)
-            detectEmotionFromFrame(frame)
-          } else if (!frame) {
-            console.warn('Frame capture returned null - video may not be ready')
-          } else {
-            console.log('Skipping detection - prediction is paused')
-          }
-        }, 1500) // Capture every 1.5 seconds
-      }, 1000) // Wait 1 second for video to stabilize
-      
+        detectionActiveRef.current = true
+        runNextDetection()
+      }, 500)
+
       // Start duration timer
       durationIntervalRef.current = setInterval(() => {
         setRecordingDuration(prev => prev + 1)
       }, 1000)
-      
+
     } catch (error: any) {
       console.error('Error accessing webcam:', error)
       setCameraError(error.message || 'Failed to access camera. Please check permissions.')
@@ -444,44 +484,40 @@ export default function NewCheckInPage() {
 
   // Stop webcam
   const stopWebcam = () => {
+    detectionActiveRef.current = false
+
     if (captureIntervalRef.current) {
       clearInterval(captureIntervalRef.current)
       captureIntervalRef.current = null
     }
-    
+
     if (durationIntervalRef.current) {
       clearInterval(durationIntervalRef.current)
       durationIntervalRef.current = null
     }
-    
+
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop())
       streamRef.current = null
     }
-    
+
     if (videoRef.current) {
       videoRef.current.srcObject = null
     }
-    
-      setIsRecording(false)
-      setIsPredicting(false) // Stop prediction when recording stops
-      isPredictingRef.current = false // Update ref as well
-      setRecordingDuration(0)
+
+    setIsRecording(false)
+    setIsPredicting(false) // Stop prediction when recording stops
+    isPredictingRef.current = false // Update ref as well
+    setRecordingDuration(0)
   }
 
   // Toggle prediction (pause/resume) without stopping recording
   const togglePrediction = () => {
     setIsPredicting(prev => {
       const newValue = !prev
-      isPredictingRef.current = newValue // Update ref synchronously
-      if (newValue) {
-        // If resuming prediction, immediately capture a frame
-        setTimeout(() => {
-          const frame = captureFrame()
-          if (frame) {
-            detectEmotionFromFrame(frame)
-          }
-        }, 100)
+      isPredictingRef.current = newValue
+      if (newValue && detectionActiveRef.current) {
+        runNextDetection()
       }
       return newValue
     })
@@ -517,51 +553,70 @@ export default function NewCheckInPage() {
     const emojiMap: Record<string, string> = {
       happy: '😊', sad: '😢', angry: '😠', anxious: '😰', calm: '😌', excited: '🤩',
       loved: '🥰', confident: '😎', frustrated: '😤', grateful: '🙏', lonely: '😔',
-      proud: '😌', scared: '😨', surprised: '😮', energetic: '⚡', peaceful: '☮️'
+      proud: '😌', scared: '😨', surprised: '😮', energetic: '⚡', peaceful: '☮️',
+      neutral: '😐', disgusted: '🤢', fearful: '😨', contempt: '😒',
     }
     return emojiMap[emotion] || '😊'
   }
 
+  const sessionSummary = useMemo(() => {
+    if (emotionHistory.length < 2) return null
+    const freq: Record<string, { count: number; totalConf: number }> = {}
+    emotionHistory.forEach(e => {
+      if (!freq[e.emotion]) freq[e.emotion] = { count: 0, totalConf: 0 }
+      freq[e.emotion].count += 1
+      freq[e.emotion].totalConf += parseFloat(e.confidence)
+    })
+    const sorted = Object.entries(freq).sort((a, b) => b[1].count - a[1].count)
+    return {
+      dominant: sorted[0][0],
+      dominantPct: Math.round(sorted[0][1].count / emotionHistory.length * 100),
+      avgConfidence: (sorted[0][1].totalConf / sorted[0][1].count).toFixed(1),
+      uniqueCount: sorted.length,
+      total: emotionHistory.length,
+    }
+  }, [emotionHistory])
+
+  const expressSubtitle =
+    entryType === 'text'
+      ? 'Share how you feel — AI detects emotions as you write'
+      : entryType === 'voice'
+        ? 'Speak naturally — we analyze tone and mood'
+        : 'Video log — AI reads your facial expressions in real time'
+
   return (
     <>
-      <div className="bg-gray-50 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6">
-        <header className="border-b border-neutral-200 bg-white sticky top-0 z-10">
-          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/dashboard" className="w-9 h-9 border border-neutral-200 rounded-lg flex items-center justify-center hover:bg-neutral-50 transition-colors">
-                <ArrowLeft className="w-5 h-5" />
-              </Link>
-              <div>
-                <h1 className="text-xl font-bold">Express Yourself</h1>
-                <p className="text-sm text-neutral-600 flex items-center gap-2">
-                  {entryType === 'text' && <><Type className="w-4 h-4" /> Share how you're feeling - AI will detect your emotions</>}
-                  {entryType === 'voice' && <><Mic className="w-4 h-4" /> Voice your thoughts - AI will analyze your tone</>}
-                  {entryType === 'video' && <><Video className="w-4 h-4" /> Video log - AI will read your expressions</>}
-                </p>
-              </div>
-            </div>
-            <button onClick={handleSave} disabled={(!content.trim() && entryType === 'text') || isSaving}
-              className="flex items-center gap-2 px-6 py-3 bg-black text-white rounded-lg hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-              {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-              <span className="font-medium">{isSaving ? 'Saving...' : 'Save Check-In'}</span>
-            </button>
-          </div>
-        </header>
+      <PageHeading
+        icon={PenLine}
+        title="Express Yourself"
+        subtitle={expressSubtitle}
+        actions={
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={(!content.trim() && entryType === 'text') || isSaving}
+            className="flex items-center justify-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 bg-black text-white rounded-lg hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+          >
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {isSaving ? 'Saving...' : 'Save check-in'}
+          </button>
+        }
+      />
 
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="bg-gray-50 -mx-4 sm:-mx-6 mt-2 sm:mt-3 rounded-xl border border-neutral-100/80 shadow-sm overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-5 sm:pt-7 pb-6 sm:pb-10">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-8">
             <div className="lg:col-span-2 space-y-6">
               {/* Input Method Selector */}
-              <div className="mb-6 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+              <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                 <p className="text-sm font-medium text-indigo-900 mb-3">Choose how you'd like to express yourself:</p>
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     onClick={() => router.push('/check-in/new?type=text')}
-                    className={`p-3 rounded-lg border-2 transition-all text-center ${
-                      entryType === 'text' 
-                        ? 'border-indigo-500 bg-indigo-100 shadow-sm' 
+                    className={`p-3 rounded-lg border-2 transition-all text-center ${entryType === 'text'
+                        ? 'border-indigo-500 bg-indigo-100 shadow-sm'
                         : 'border-neutral-200 bg-white hover:border-indigo-400 hover:shadow-sm'
-                    }`}
+                      }`}
                   >
                     <Type className="w-5 h-5 mx-auto mb-1.5 text-indigo-600" />
                     <p className="text-xs font-medium">Text</p>
@@ -569,11 +624,10 @@ export default function NewCheckInPage() {
                   </button>
                   <button
                     onClick={() => router.push('/check-in/new?type=voice')}
-                    className={`p-3 rounded-lg border-2 transition-all text-center ${
-                      entryType === 'voice' 
-                        ? 'border-indigo-500 bg-indigo-100 shadow-sm' 
+                    className={`p-3 rounded-lg border-2 transition-all text-center ${entryType === 'voice'
+                        ? 'border-indigo-500 bg-indigo-100 shadow-sm'
                         : 'border-neutral-200 bg-white hover:border-indigo-400 hover:shadow-sm'
-                    }`}
+                      }`}
                   >
                     <Mic className="w-5 h-5 mx-auto mb-1.5 text-indigo-600" />
                     <p className="text-xs font-medium">Voice</p>
@@ -581,11 +635,10 @@ export default function NewCheckInPage() {
                   </button>
                   <button
                     onClick={() => router.push('/check-in/new?type=video')}
-                    className={`p-3 rounded-lg border-2 transition-all text-center ${
-                      entryType === 'video' 
-                        ? 'border-indigo-500 bg-indigo-100 shadow-sm' 
+                    className={`p-3 rounded-lg border-2 transition-all text-center ${entryType === 'video'
+                        ? 'border-indigo-500 bg-indigo-100 shadow-sm'
                         : 'border-neutral-200 bg-white hover:border-indigo-400 hover:shadow-sm'
-                    }`}
+                      }`}
                   >
                     <Video className="w-5 h-5 mx-auto mb-1.5 text-indigo-600" />
                     <p className="text-xs font-medium">Video</p>
@@ -597,9 +650,9 @@ export default function NewCheckInPage() {
               {/* Title Input */}
               <div>
                 <label className="block text-sm font-medium mb-2 text-neutral-700">Title (Optional)</label>
-                <input 
-                  type="text" 
-                  value={title} 
+                <input
+                  type="text"
+                  value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Give your entry a title..."
                   className="w-full px-4 py-3 border border-neutral-200 rounded-lg focus:outline-none focus:border-black focus:ring-2 focus:ring-black/5 transition-all"
@@ -610,11 +663,11 @@ export default function NewCheckInPage() {
               {entryType === 'text' && (
                 <div>
                   <label className="block text-sm font-medium mb-2 text-neutral-700">Your Thoughts</label>
-                  <textarea 
-                    value={content} 
+                  <textarea
+                    value={content}
                     onChange={(e) => setContent(e.target.value)}
                     placeholder="Start writing... Our AI will analyze your emotions in real-time as you type."
-                    className="w-full h-96 p-4 border border-neutral-200 rounded-lg focus:outline-none focus:border-black focus:ring-2 focus:ring-black/5 resize-none transition-all text-base leading-relaxed"
+                    className="w-full h-60 sm:h-96 p-4 border border-neutral-200 rounded-lg focus:outline-none focus:border-black focus:ring-2 focus:ring-black/5 resize-none transition-all text-base leading-relaxed"
                   />
                   <div className="flex items-center justify-between mt-2 text-sm">
                     <span className="text-neutral-500">{content.length} characters • {Math.ceil(content.split(' ').filter(w => w).length)} words</span>
@@ -661,10 +714,25 @@ export default function NewCheckInPage() {
               {entryType === 'video' && (
                 <div>
                   <label className="block text-sm font-medium mb-2 text-neutral-700">Video Recording</label>
+                  {cameraGate === 'needs_https' && (
+                    <div className="mb-3 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-950">
+                      <p className="font-medium flex items-start gap-2">
+                        <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                        Camera unavailable on this connection
+                      </p>
+                      <p className="mt-2 text-amber-900/90 leading-relaxed">{HTTPS_CAMERA_HELP}</p>
+                    </div>
+                  )}
+                  {cameraGate === 'no_api' && (
+                    <div className="mb-3 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-950">
+                      <p className="font-medium">Camera API not exposed in this browser.</p>
+                      <p className="mt-1 text-amber-900/90">Try Chrome or Safari, or update your browser.</p>
+                    </div>
+                  )}
                   <div className="border-2 border-dashed border-neutral-300 rounded-lg p-4 bg-neutral-900 relative overflow-hidden">
                     {/* Hidden canvas for frame capture */}
                     <canvas ref={canvasRef} className="hidden" />
-                    
+
                     {/* Video element */}
                     <video
                       ref={videoRef}
@@ -673,7 +741,7 @@ export default function NewCheckInPage() {
                       muted
                       className={`w-full h-auto rounded-lg ${isRecording ? 'block' : 'hidden'}`}
                     />
-                    
+
                     {/* Placeholder when not recording */}
                     {!isRecording && (
                       <div className="flex flex-col items-center justify-center py-12">
@@ -684,15 +752,17 @@ export default function NewCheckInPage() {
                         <p className="text-sm text-neutral-400 mb-6 text-center px-4">
                           Position your face in the center. AI will analyze your facial expressions in real-time.
                         </p>
-                        <button 
-                          onClick={toggleRecording} 
-                          className="px-8 py-3 bg-white text-black rounded-lg hover:bg-neutral-200 transition-colors font-medium"
+                        <button
+                          type="button"
+                          onClick={toggleRecording}
+                          disabled={cameraGate === 'needs_https' || cameraGate === 'no_api' || cameraGate === 'pending'}
+                          className="px-8 py-3 bg-white text-black rounded-lg hover:bg-neutral-200 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          Enable Camera
+                          {cameraGate === 'pending' ? 'Checking…' : 'Enable Camera'}
                         </button>
                       </div>
                     )}
-                    
+
                     {/* Recording controls */}
                     {isRecording && (
                       <div className="absolute bottom-4 left-0 right-0 flex flex-col items-center gap-4">
@@ -703,19 +773,18 @@ export default function NewCheckInPage() {
                           </p>
                         </div>
                         <div className="flex gap-3">
-                          <button 
-                            onClick={togglePrediction} 
-                            className={`px-6 py-3 rounded-lg transition-colors font-medium ${
-                              isPredicting 
-                                ? 'bg-yellow-600 text-white hover:bg-yellow-700' 
+                          <button
+                            onClick={togglePrediction}
+                            className={`px-6 py-3 rounded-lg transition-colors font-medium ${isPredicting
+                                ? 'bg-yellow-600 text-white hover:bg-yellow-700'
                                 : 'bg-gray-600 text-white hover:bg-gray-700'
-                            }`}
+                              }`}
                             title={isPredicting ? 'Pause emotion detection' : 'Resume emotion detection'}
                           >
                             {isPredicting ? '⏸ Pause Detection' : '▶ Resume Detection'}
                           </button>
-                          <button 
-                            onClick={toggleRecording} 
+                          <button
+                            onClick={toggleRecording}
                             className="px-8 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
                           >
                             Stop Recording
@@ -733,7 +802,7 @@ export default function NewCheckInPage() {
                         )}
                       </div>
                     )}
-                    
+
                     {/* Error message */}
                     {cameraError && (
                       <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -741,12 +810,12 @@ export default function NewCheckInPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Optional text content for video entries */}
                   <div className="mt-4">
                     <label className="block text-sm font-medium mb-2 text-neutral-700">Additional Notes (Optional)</label>
-                    <textarea 
-                      value={content} 
+                    <textarea
+                      value={content}
                       onChange={(e) => setContent(e.target.value)}
                       placeholder="Add any additional thoughts or context about this moment..."
                       className="w-full h-32 p-4 border border-neutral-200 rounded-lg focus:outline-none focus:border-black focus:ring-2 focus:ring-black/5 resize-none transition-all text-base leading-relaxed"
@@ -759,12 +828,12 @@ export default function NewCheckInPage() {
               <div>
                 <label className="block text-sm font-medium mb-2 text-neutral-700">Tags (Optional)</label>
                 <div className="flex gap-2 mb-3">
-                  <input 
-                    type="text" 
-                    value={tagInput} 
+                  <input
+                    type="text"
+                    value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                    placeholder="Add tags like 'work', 'family', 'gratitude'..." 
+                    placeholder="Add tags like 'work', 'family', 'gratitude'..."
                     className="flex-1 px-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:border-black focus:ring-2 focus:ring-black/5 transition-all"
                   />
                   <button onClick={addTag} className="px-6 py-2 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors font-medium">
@@ -788,7 +857,7 @@ export default function NewCheckInPage() {
             <div>
               <div className="sticky top-24 space-y-4">
                 {/* ML Detection Panel */}
-                <div className="border-2 border-indigo-200 bg-indigo-50/50 rounded-lg p-6">
+                <div className="border-2 border-indigo-200 bg-indigo-50/50 rounded-lg p-4 sm:p-6">
                   <div className="flex items-center gap-2 mb-4">
                     <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
                       <Brain className="w-5 h-5 text-white" />
@@ -849,9 +918,9 @@ export default function NewCheckInPage() {
                                 </span>
                               </div>
                               <div className="h-2 bg-neutral-100 rounded-full overflow-hidden">
-                                <div 
-                                  className="h-full transition-all duration-500 rounded-full" 
-                                  style={{ 
+                                <div
+                                  className="h-full transition-all duration-500 rounded-full"
+                                  style={{
                                     width: `${typeof pred.confidence === 'string' ? parseFloat(pred.confidence) : pred.confidence}%`,
                                     backgroundColor: EMOTION_COLORS[pred.emotion] || '#000'
                                   }}
@@ -861,6 +930,41 @@ export default function NewCheckInPage() {
                           ))}
                         </div>
                       </div>
+
+                      {/* Emotion Timeline */}
+                      {emotionHistory.length > 1 && (
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-semibold text-neutral-700 flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5" />
+                              Timeline
+                            </span>
+                            <span className="text-xs text-neutral-500">{emotionHistory.length} readings</span>
+                          </div>
+                          <div className="max-h-44 overflow-y-auto space-y-1">
+                            {[...emotionHistory].reverse().map((entry, idx) => {
+                              const elapsed = Math.max(0, Math.round((entry.timestamp - recordingStartRef.current) / 1000))
+                              const m = Math.floor(elapsed / 60)
+                              const s = elapsed % 60
+                              return (
+                                <div key={idx} className="flex items-center gap-2 text-xs py-1.5 px-2 rounded-md bg-white border border-neutral-100">
+                                  <span className="text-neutral-400 font-mono tabular-nums w-8 shrink-0">{m}:{s.toString().padStart(2, '0')}</span>
+                                  <span className="shrink-0">{getEmoji(entry.emotion)}</span>
+                                  <span className="capitalize font-medium truncate">{entry.emotion}</span>
+                                  <span className="ml-auto font-bold tabular-nums shrink-0" style={{ color: EMOTION_COLORS[entry.emotion] }}>{entry.confidence}%</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                          {sessionSummary && (
+                            <div className="mt-2 p-2.5 bg-indigo-100/60 rounded-lg text-xs flex items-center gap-2">
+                              <span className="text-indigo-600 font-medium">Dominant:</span>
+                              <span className="font-bold capitalize">{sessionSummary.dominant} {getEmoji(sessionSummary.dominant)}</span>
+                              <span className="text-indigo-500 ml-auto">{sessionSummary.dominantPct}% of readings</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* Model Info */}
                       <div className="pt-4 border-t border-indigo-200">
@@ -876,16 +980,16 @@ export default function NewCheckInPage() {
                           </span>
                         </div>
                       </div>
-                      
+
                       {/* Recommendations Preview */}
                       {recommendations && (
                         <div className="pt-4 border-t border-indigo-200 mt-4">
                           <div className="text-sm font-semibold mb-3 text-indigo-900">Personalized Recommendations</div>
                           <div className="space-y-2">
                             {recommendations.music?.playlist_url && (
-                              <a 
-                                href={recommendations.music.playlist_url} 
-                                target="_blank" 
+                              <a
+                                href={recommendations.music.playlist_url}
+                                target="_blank"
                                 rel="noopener noreferrer"
                                 className="block p-2 bg-white rounded-lg border border-indigo-200 hover:border-indigo-400 transition-colors text-xs"
                               >
@@ -913,7 +1017,7 @@ export default function NewCheckInPage() {
                                 </div>
                               </div>
                             )}
-                            <Link 
+                            <Link
                               href="/recommendations"
                               className="block text-center text-xs text-indigo-600 hover:text-indigo-800 font-medium mt-2"
                             >
@@ -971,14 +1075,14 @@ export default function NewCheckInPage() {
             )}
 
             <div className="space-y-3">
-              <button 
+              <button
                 onClick={handleViewRecommendations}
                 className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium flex items-center justify-center gap-2"
               >
                 <Sparkles className="w-5 h-5" />
                 View Recommendations
               </button>
-              <button 
+              <button
                 onClick={handleBackToDashboard}
                 className="w-full px-6 py-3 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors font-medium"
               >

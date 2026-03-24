@@ -15,11 +15,10 @@ export default function MainContent({ children }: { children: React.ReactNode })
 
   return (
     <main
-      className={`transition-all duration-300 ${
-        isPublicPage
+      className={`transition-all duration-300 ${isPublicPage
           ? ''
           : `pt-16 pb-4 px-4 md:px-6 ${isCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`
-      }`}
+        }`}
     >
       <div className={isPublicPage ? '' : 'max-w-6xl mx-auto'}>{children}</div>
     </main>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Music, Dumbbell, Quote, Play, Check, Clock, TrendingUp, Sparkles, BookmarkPlus, Bookmark, Brain, RefreshCw, Loader2, ExternalLink, Settings } from 'lucide-react';
+import { Music, Dumbbell, Quote, Play, Check, Clock, TrendingUp, Sparkles, BookmarkPlus, Bookmark, Brain, Loader2, ExternalLink } from 'lucide-react';
 
 import MusicPlayer from '@/components/MusicPlayer';
 import { apiGetPersonalizedRecommendations, apiSendRecommendationFeedback } from '@/lib/api';
@@ -83,18 +83,6 @@ export default function PersonalizedRecommendationsPage() {
 
     loadRecommendations();
   }, []);
-
-  // Refresh with selected emotion
-  const handleRefresh = async () => {
-    const emotionToUse = selectedEmotion || emotionData?.dominant || 'neutral';
-    setIsRefreshing(true);
-    const success = await fetchFromAPI(emotionToUse);
-    if (!success) {
-      // If API fails, keep current data
-      console.warn('API refresh failed, keeping current data');
-    }
-    setIsRefreshing(false);
-  };
 
   // Transform microservice recommendations to display format
   const musicData = recommendations?.music;
@@ -308,32 +296,13 @@ export default function PersonalizedRecommendationsPage() {
   return (
     <div className="space-y-4">
       {/* Page Header */}
-      <div className="bg-white border-b border-gray-200 -mx-4 sm:-mx-6 px-4 sm:px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-indigo-100 rounded-xl flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-indigo-600" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold leading-none">Emotional Support</h1>
-            <p className="text-xs text-gray-500 mt-0.5">Personalized recommendations based on your detected emotions</p>
-          </div>
+      <div className="bg-white border-b border-gray-200 -mx-4 sm:-mx-6 px-4 sm:px-6 py-4 flex items-center gap-3">
+        <div className="w-9 h-9 bg-indigo-100 rounded-xl flex items-center justify-center shrink-0">
+          <Sparkles className="w-5 h-5 text-indigo-600" />
         </div>
-        <div className="flex items-center gap-2">
-          <a
-            href="/settings"
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Personalization settings"
-          >
-            <Settings className="w-4 h-4 text-gray-500" />
-          </a>
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
+        <div className="min-w-0">
+          <h1 className="text-lg font-bold leading-none">Emotional Support</h1>
+          <p className="text-xs text-gray-500 mt-0.5">Personalized recommendations based on your detected emotions</p>
         </div>
       </div>
 
