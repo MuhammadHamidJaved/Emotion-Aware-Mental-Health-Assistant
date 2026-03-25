@@ -7,11 +7,11 @@ import requests
 import logging
 from datetime import datetime
 
-from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
 from django.conf import settings as django_settings
+from common.external_service_utils import log_external_failure, map_external_exception
+from .response_helpers import error_response, ok_response
 
 logger = logging.getLogger(__name__)
 
@@ -126,38 +126,26 @@ def get_recommendations(request):
 
         recommendations = data.get('recommendations', {})
 
-        return Response({
+        return ok_response({
             'recommendation_id': data.get('recommendation_id', ''),
             'emotion': emotion,
             'recommendations': recommendations,
             'preferences_used': merged_prefs,
             'personalization_applied': data.get('personalization_applied', {}),
-        }, status=status.HTTP_200_OK)
+        })
 
-    except requests.exceptions.Timeout:
-        logger.error("Timeout calling recommendation microservice")
-        return Response(
-            {'error': 'Recommendation service timed out. Please try again.'},
-            status=status.HTTP_504_GATEWAY_TIMEOUT,
-        )
-    except requests.exceptions.ConnectionError:
-        logger.error("Cannot connect to recommendation microservice")
-        return Response(
-            {'error': 'Recommendation service is not available. Make sure it is running on port 5001.'},
-            status=status.HTTP_503_SERVICE_UNAVAILABLE,
-        )
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error calling recommendation microservice: {e}")
-        return Response(
-            {'error': f'Recommendation service error: {str(e)}'},
-            status=status.HTTP_502_BAD_GATEWAY,
-        )
     except Exception as e:
-        logger.error(f"Unexpected error fetching recommendations: {e}")
-        return Response(
-            {'error': str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        error_info = map_external_exception(
+            e,
+            service_name='recommendation-microservice',
+            operation='recommend',
+            timeout_message='Recommendation service timed out. Please try again.',
+            connection_message='Recommendation service is not available. Make sure it is running on port 5001.',
+            request_message='Recommendation service error. Please try again.',
+            unexpected_message='Recommendation service error. Please try again.',
         )
+        log_external_failure(logger, error_info)
+        return error_response(error_info.user_message, error_info.status_code)
 
 
 @api_view(['POST'])
@@ -189,20 +177,20 @@ def send_feedback(request):
         url = f"{RECOMMENDATION_MICROSERVICE_URL}/feedback"
         resp = requests.post(url, json=payload, timeout=10)
         resp.raise_for_status()
-        return Response(resp.json(), status=status.HTTP_200_OK)
+        return ok_response(resp.json())
 
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error sending feedback to microservice: {e}")
-        return Response(
-            {'error': 'Could not send feedback. Please try again later.'},
-            status=status.HTTP_502_BAD_GATEWAY,
-        )
     except Exception as e:
-        logger.error(f"Unexpected error sending feedback: {e}")
-        return Response(
-            {'error': str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        error_info = map_external_exception(
+            e,
+            service_name='recommendation-microservice',
+            operation='feedback',
+            timeout_message='Could not send feedback. Service timed out.',
+            connection_message='Could not send feedback. Recommendation service is unavailable.',
+            request_message='Could not send feedback. Please try again later.',
+            unexpected_message='Could not send feedback. Please try again later.',
         )
+        log_external_failure(logger, error_info)
+        return error_response(error_info.user_message, error_info.status_code)
 
 
 @api_view(['GET'])
@@ -217,14 +205,20 @@ def get_recommendation_history(request):
         url = f"{RECOMMENDATION_MICROSERVICE_URL}/history/{request.user.id}"
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
-        return Response(resp.json(), status=status.HTTP_200_OK)
+        return ok_response(resp.json())
 
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error fetching recommendation history: {e}")
-        return Response(
-            {'error': 'Could not load history.'},
-            status=status.HTTP_502_BAD_GATEWAY,
+    except Exception as e:
+        error_info = map_external_exception(
+            e,
+            service_name='recommendation-microservice',
+            operation='history',
+            timeout_message='Could not load history. Service timed out.',
+            connection_message='Could not load history. Recommendation service is unavailable.',
+            request_message='Could not load history.',
+            unexpected_message='Could not load history.',
         )
+        log_external_failure(logger, error_info)
+        return error_response(error_info.user_message, error_info.status_code)
 
 
 @api_view(['GET'])
@@ -239,11 +233,17 @@ def get_recommendation_patterns(request):
         url = f"{RECOMMENDATION_MICROSERVICE_URL}/patterns/{request.user.id}"
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
-        return Response(resp.json(), status=status.HTTP_200_OK)
+        return ok_response(resp.json())
 
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error fetching recommendation patterns: {e}")
-        return Response(
-            {'error': 'Could not load patterns.'},
-            status=status.HTTP_502_BAD_GATEWAY,
+    except Exception as e:
+        error_info = map_external_exception(
+            e,
+            service_name='recommendation-microservice',
+            operation='patterns',
+            timeout_message='Could not load patterns. Service timed out.',
+            connection_message='Could not load patterns. Recommendation service is unavailable.',
+            request_message='Could not load patterns.',
+            unexpected_message='Could not load patterns.',
         )
+        log_external_failure(logger, error_info)
+        return error_response(error_info.user_message, error_info.status_code)

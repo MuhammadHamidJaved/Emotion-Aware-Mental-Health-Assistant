@@ -52,6 +52,10 @@ export default function NewCheckInPage() {
   }>>([])
   const detectionActiveRef = useRef(false)
   const recordingStartRef = useRef(0)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioStreamRef = useRef<MediaStream | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const [voiceError, setVoiceError] = useState<string | null>(null)
 
   /** Camera/mic APIs require a secure context (HTTPS or localhost). Plain http:// + LAN IP is blocked on mobile Chrome. */
   const [cameraGate, setCameraGate] = useState<'pending' | 'ok' | 'needs_https' | 'no_api'>('pending')
@@ -71,6 +75,25 @@ export default function NewCheckInPage() {
       return
     }
     setCameraGate('ok')
+  }, [entryType])
+
+  /** Mic recording needs secure context (same as camera) on many browsers. */
+  const [voiceGate, setVoiceGate] = useState<'pending' | 'ok' | 'needs_https' | 'no_api'>('pending')
+  useEffect(() => {
+    if (entryType !== 'voice') {
+      setVoiceGate('ok')
+      return
+    }
+    if (typeof window === 'undefined') return
+    if (!window.isSecureContext) {
+      setVoiceGate('needs_https')
+      return
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setVoiceGate('no_api')
+      return
+    }
+    setVoiceGate('ok')
   }, [entryType])
 
   const HTTPS_CAMERA_HELP =
@@ -176,16 +199,23 @@ export default function NewCheckInPage() {
 
   const handleSave = async () => {
     if (!content.trim() && entryType === 'text') return
+    if (entryType === 'voice' && isRecording) {
+      alert('Please stop recording before saving.')
+      return
+    }
     if (entryType === 'video' && !finalEmotion) {
       alert('Please record a video to detect your emotion first.')
+      return
+    }
+    if (entryType === 'voice' && !finalEmotion) {
+      alert('Please record your voice so we can detect your emotion.')
       return
     }
 
     setIsSaving(true)
 
     try {
-      // Stop webcam if recording
-      if (isRecording) {
+      if (entryType === 'video' && isRecording) {
         stopWebcam()
       }
 
@@ -202,6 +232,9 @@ export default function NewCheckInPage() {
         entryData.text_content = content.trim()
       } else if (entryType === 'video') {
         entryData.transcription = content.trim() || 'Video entry'
+        entryData.duration = recordingDuration
+      } else if (entryType === 'voice') {
+        entryData.transcription = content.trim() || 'Voice check-in'
         entryData.duration = recordingDuration
       }
 
@@ -511,6 +544,152 @@ export default function NewCheckInPage() {
     setRecordingDuration(0)
   }
 
+  const releaseVoiceResources = () => {
+    if (durationIntervalRef.current) {
+      clearInterval(durationIntervalRef.current)
+      durationIntervalRef.current = null
+    }
+    audioStreamRef.current?.getTracks().forEach(t => t.stop())
+    audioStreamRef.current = null
+    mediaRecorderRef.current = null
+    audioChunksRef.current = []
+    setIsRecording(false)
+  }
+
+  const detectEmotionFromVoiceBlob = async (blob: Blob) => {
+    setIsAnalyzing(true)
+    setVoiceError(null)
+    try {
+      const token = getAccessToken()
+      if (!token) {
+        throw new Error('Authentication required. Please log in again.')
+      }
+      const formData = new FormData()
+      formData.append('file', blob, 'recording.webm')
+      const response = await fetch(`${API_URL}/api/assistant/emotion/detect/audio/`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        body: formData
+      })
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Authentication required. Please log in again.')
+        }
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || errorData.message || errorData.details || 'Failed to analyze voice')
+      }
+
+      const data = await response.json()
+
+      if (data.success) {
+        const predictedEmotion = data.predicted_emotion.toLowerCase()
+        const confidence = (data.confidence * 100).toFixed(1)
+        const predictions = Object.entries(data.all_scores || {}).map(([emotion, score]: [string, any]) => ({
+          emotion: emotion.toLowerCase(),
+          confidence: (Number(score) * 100).toFixed(1)
+        })).sort((a: any, b: any) => parseFloat(b.confidence) - parseFloat(a.confidence))
+
+        const emotionData = {
+          dominant: predictedEmotion,
+          confidence,
+          predictions: predictions.slice(0, 5),
+          processingTime: data.processing_time_ms || 0,
+          allScores: data.all_scores,
+          top3: data.top_3
+        }
+
+        setLiveEmotion(emotionData)
+        setFinalEmotion(emotionData)
+
+        if (data.recommendations) {
+          setRecommendations(data.recommendations)
+          localStorage.setItem('lastRecommendations', JSON.stringify({
+            emotion: predictedEmotion,
+            confidence,
+            recommendations: data.recommendations,
+            timestamp: new Date().toISOString()
+          }))
+        }
+      }
+    } catch (error: any) {
+      console.error('Voice emotion error:', error)
+      setVoiceError(error.message || 'Failed to analyze voice. Ensure the voice service is running on port 5003.')
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
+
+  const startVoiceRecording = async () => {
+    setVoiceError(null)
+    if (voiceGate !== 'ok') return
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      audioStreamRef.current = stream
+      audioChunksRef.current = []
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+          ? 'audio/webm'
+          : ''
+      const mr = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream)
+      mediaRecorderRef.current = mr
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data)
+      }
+      mr.start(250)
+      setLiveEmotion(null)
+      setFinalEmotion(null)
+      setRecommendations(null)
+      setRecordingDuration(0)
+      recordingStartRef.current = Date.now()
+      setIsRecording(true)
+      durationIntervalRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1)
+      }, 1000)
+    } catch (error: any) {
+      console.error('Voice recording error:', error)
+      setVoiceError(error.message || 'Could not access microphone.')
+    }
+  }
+
+  const stopVoiceRecording = async () => {
+    const mr = mediaRecorderRef.current
+    if (!mr || mr.state === 'inactive') {
+      releaseVoiceResources()
+      return
+    }
+    if (durationIntervalRef.current) {
+      clearInterval(durationIntervalRef.current)
+      durationIntervalRef.current = null
+    }
+
+    const mimeType = mr.mimeType
+    await new Promise<void>((resolve) => {
+      mr.onstop = () => resolve()
+      mr.stop()
+    })
+
+    audioStreamRef.current?.getTracks().forEach(t => t.stop())
+    audioStreamRef.current = null
+    mediaRecorderRef.current = null
+    setIsRecording(false)
+
+    const blob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' })
+    audioChunksRef.current = []
+
+    if (blob.size < 256) {
+      setVoiceError('Recording too short. Speak for at least a second, then stop.')
+      return
+    }
+
+    await detectEmotionFromVoiceBlob(blob)
+  }
+
   // Toggle prediction (pause/resume) without stopping recording
   const togglePrediction = () => {
     setIsPredicting(prev => {
@@ -523,7 +702,7 @@ export default function NewCheckInPage() {
     })
   }
 
-  const toggleRecording = () => {
+  const toggleVideoRecording = () => {
     if (isRecording) {
       stopWebcam()
     } else {
@@ -531,10 +710,22 @@ export default function NewCheckInPage() {
     }
   }
 
+  useEffect(() => {
+    if (entryType === 'text') {
+      stopWebcam()
+      releaseVoiceResources()
+    } else if (entryType === 'voice') {
+      stopWebcam()
+    } else if (entryType === 'video') {
+      releaseVoiceResources()
+    }
+  }, [entryType])
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       stopWebcam()
+      releaseVoiceResources()
     }
   }, [])
 
@@ -685,6 +876,21 @@ export default function NewCheckInPage() {
               {entryType === 'voice' && (
                 <div>
                   <label className="block text-sm font-medium mb-2 text-neutral-700">Voice Recording</label>
+                  {voiceGate === 'needs_https' && (
+                    <div className="mb-3 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-950">
+                      <p className="font-medium flex items-start gap-2">
+                        <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                        Microphone unavailable on this connection
+                      </p>
+                      <p className="mt-2 text-amber-900/90 leading-relaxed">{HTTPS_CAMERA_HELP}</p>
+                    </div>
+                  )}
+                  {voiceGate === 'no_api' && (
+                    <div className="mb-3 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-950">
+                      <p className="font-medium">Microphone API not exposed in this browser.</p>
+                      <p className="mt-1 text-amber-900/90">Try Chrome or Safari, or update your browser.</p>
+                    </div>
+                  )}
                   <div className="border-2 border-dashed border-neutral-300 rounded-lg p-12 flex flex-col items-center justify-center bg-neutral-50">
                     <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 transition-all ${isRecording ? 'bg-red-100 animate-pulse' : 'bg-neutral-200'}`}>
                       <Mic className={`w-12 h-12 ${isRecording ? 'text-red-600' : 'text-neutral-600'}`} />
@@ -693,18 +899,43 @@ export default function NewCheckInPage() {
                       <>
                         <p className="text-lg font-medium mb-2">Recording...</p>
                         <p className="text-3xl font-bold text-red-600 mb-6">{Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')}</p>
-                        <button onClick={toggleRecording} className="px-8 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium">
-                          Stop Recording
+                        <button
+                          type="button"
+                          onClick={() => void stopVoiceRecording()}
+                          className="px-8 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                        >
+                          Stop &amp; analyze
                         </button>
+                        <p className="text-xs text-neutral-500 mt-3 max-w-sm text-center">
+                          We send audio to the voice model (port 5003) after you stop.
+                        </p>
                       </>
                     ) : (
                       <>
                         <p className="text-lg font-medium text-neutral-700 mb-2">Ready to record</p>
-                        <p className="text-sm text-neutral-500 mb-6">Speak naturally. Our AI will analyze your tone and emotions.</p>
-                        <button onClick={toggleRecording} className="px-8 py-3 bg-black text-white rounded-lg hover:bg-neutral-800 transition-colors font-medium">
-                          Start Recording
+                        <p className="text-sm text-neutral-500 mb-6 text-center max-w-md">
+                          Speak naturally. When you stop, we analyze your voice with the Wav2Vec2 service.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => void startVoiceRecording()}
+                          disabled={voiceGate === 'needs_https' || voiceGate === 'no_api' || voiceGate === 'pending'}
+                          className="px-8 py-3 bg-black text-white rounded-lg hover:bg-neutral-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {voiceGate === 'pending' ? 'Checking…' : 'Start Recording'}
                         </button>
                       </>
+                    )}
+                    {isAnalyzing && !isRecording && (
+                      <p className="mt-6 flex items-center gap-2 text-sm text-indigo-600 font-medium">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Analyzing voice…
+                      </p>
+                    )}
+                    {voiceError && (
+                      <div className="mt-4 p-3 w-full max-w-md bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+                        {voiceError}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -754,7 +985,7 @@ export default function NewCheckInPage() {
                         </p>
                         <button
                           type="button"
-                          onClick={toggleRecording}
+                          onClick={toggleVideoRecording}
                           disabled={cameraGate === 'needs_https' || cameraGate === 'no_api' || cameraGate === 'pending'}
                           className="px-8 py-3 bg-white text-black rounded-lg hover:bg-neutral-200 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                         >
@@ -784,7 +1015,7 @@ export default function NewCheckInPage() {
                             {isPredicting ? '⏸ Pause Detection' : '▶ Resume Detection'}
                           </button>
                           <button
-                            onClick={toggleRecording}
+                            onClick={toggleVideoRecording}
                             className="px-8 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
                           >
                             Stop Recording
@@ -876,7 +1107,10 @@ export default function NewCheckInPage() {
                       <p className="text-sm text-indigo-700 font-medium mb-1">Waiting for input...</p>
                       <p className="text-xs text-indigo-600">
                         {entryType === 'text' && 'Start typing to see live emotion analysis'}
-                        {entryType === 'voice' && 'Start recording to analyze your tone'}
+                        {entryType === 'voice' &&
+                          (isRecording
+                            ? 'Recording… tap Stop & analyze when finished'
+                            : 'Record, then stop — we analyze your voice with the audio model')}
                         {entryType === 'video' && isRecording && !isPredicting && 'Recording... Click "Resume Detection" to analyze emotions'}
                         {entryType === 'video' && isRecording && isPredicting && 'Analyzing your expressions in real-time...'}
                         {entryType === 'video' && !isRecording && 'Start recording to analyze your expressions'}
@@ -975,7 +1209,7 @@ export default function NewCheckInPage() {
                           </span>
                           <span className="text-indigo-600 font-medium">
                             {entryType === 'text' && 'Text ML v2.1'}
-                            {entryType === 'voice' && 'Voice ML v1.8'}
+                            {entryType === 'voice' && 'Audio (Wav2Vec2)'}
                             {entryType === 'video' && 'Video ML v3.0'}
                           </span>
                         </div>

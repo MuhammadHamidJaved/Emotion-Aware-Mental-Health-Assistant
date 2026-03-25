@@ -45,28 +45,71 @@ const FALLBACK_QUOTES: QuoteData[] = [
   { id: '28', text: 'It\'s okay to not be okay. It\'s okay to ask for help.', author: 'Unknown', category: 'Comfort', emotion: 'anxious' },
 ];
 
-const EMOTION_OPTIONS = [
-  { key: 'all', label: 'All Moods', emoji: '🌈' },
-  { key: 'happy', label: 'Happy', emoji: '😊' },
-  { key: 'calm', label: 'Calm', emoji: '😌' },
-  { key: 'sad', label: 'Sad', emoji: '😢' },
-  { key: 'anxious', label: 'Anxious', emoji: '😰' },
-  { key: 'confident', label: 'Confident', emoji: '💪' },
-  { key: 'grateful', label: 'Grateful', emoji: '🙏' },
-];
+const EMOTION_META: Record<string, { label: string; emoji: string }> = {
+  happy: { label: 'Happy', emoji: '😊' },
+  calm: { label: 'Calm', emoji: '😌' },
+  sad: { label: 'Sad', emoji: '😢' },
+  anxious: { label: 'Anxious', emoji: '😰' },
+  confident: { label: 'Confident', emoji: '💪' },
+  grateful: { label: 'Grateful', emoji: '🙏' },
+  energetic: { label: 'Energetic', emoji: '⚡' },
+};
+
+const normalizeToQuoteEmotion = (emotion: string | null): string => {
+  const source = (emotion || '').toLowerCase().trim();
+  if (!source) return 'calm';
+  if (EMOTION_META[source]) return source;
+
+  const map: Record<string, string> = {
+    neutral: 'calm',
+    tired: 'calm',
+    peaceful: 'calm',
+    relaxed: 'calm',
+    frustrated: 'anxious',
+    fear: 'anxious',
+    angry: 'anxious',
+    lonely: 'sad',
+    disappointed: 'sad',
+    excited: 'energetic',
+  };
+  return map[source] || 'calm';
+};
+
+const getFallbackQuotesForEmotion = (emotion: string): QuoteData[] =>
+  FALLBACK_QUOTES.filter((q) => q.emotion === emotion);
+
+const getCategoryForEmotion = (emotion: string): string => {
+  switch (emotion) {
+    case 'happy':
+      return 'Happiness';
+    case 'calm':
+      return 'Calm';
+    case 'sad':
+    case 'anxious':
+      return 'Comfort';
+    case 'grateful':
+      return 'Gratitude';
+    case 'confident':
+    case 'energetic':
+      return 'Motivation';
+    default:
+      return 'Comfort';
+  }
+};
 
 export default function QuotesPage() {
   const searchParams = useSearchParams();
   const urlEmotion = searchParams?.get('emotion') || null;
 
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [selectedEmotion, setSelectedEmotion] = useState<string>(urlEmotion || 'all');
+  const [selectedEmotion, setSelectedEmotion] = useState<string>(normalizeToQuoteEmotion(urlEmotion));
+  const [predictedEmotionLabel, setPredictedEmotionLabel] = useState<string>((urlEmotion || '').trim());
   const [favorites, setFavorites] = useState<string[]>([]);
   const [dailyQuote, setDailyQuote] = useState<QuoteData>(FALLBACK_QUOTES[0]);
   const [apiQuotes, setApiQuotes] = useState<QuoteData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [usingFallback, setUsingFallback] = useState(false);
-  const [allQuotes, setAllQuotes] = useState<QuoteData[]>(FALLBACK_QUOTES);
+  const [allQuotes, setAllQuotes] = useState<QuoteData[]>(getFallbackQuotesForEmotion(normalizeToQuoteEmotion(urlEmotion)));
   const [userPrefs, setUserPrefs] = useState<Partial<RecommendationSettings>>({});
 
   // Load saved user preferences so content_language is forwarded to the microservice.
@@ -77,6 +120,30 @@ export default function QuotesPage() {
       .then(prefs => setUserPrefs(prefs))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const fromUrl = (searchParams?.get('emotion') || '').trim();
+    if (fromUrl) {
+      setPredictedEmotionLabel(fromUrl);
+      setSelectedEmotion(normalizeToQuoteEmotion(fromUrl));
+      return;
+    }
+
+    if (typeof window === 'undefined') return;
+    const stored = localStorage.getItem('lastRecommendations');
+    if (!stored) return;
+
+    try {
+      const parsed = JSON.parse(stored);
+      const detected = (parsed?.emotion || '').trim();
+      if (detected) {
+        setPredictedEmotionLabel(detected);
+        setSelectedEmotion(normalizeToQuoteEmotion(detected));
+      }
+    } catch {
+      // Ignore malformed cache.
+    }
+  }, [searchParams]);
 
   const categories = ['All', 'Motivation', 'Happiness', 'Calm', 'Resilience', 'Gratitude', 'Confidence', 'Comfort'];
 
@@ -93,7 +160,7 @@ export default function QuotesPage() {
 
     try {
       const data = await apiGetPersonalizedRecommendations(accessToken, {
-        emotion: emotion === 'all' ? 'neutral' : emotion,
+        emotion,
         types: ['quote'],
         preferences: {
           content_language: userPrefs.content_language,
@@ -110,17 +177,18 @@ export default function QuotesPage() {
           quotes.push({
             id: 'api-1',
             text: quoteData,
-            author: 'Personalized',
-            category: 'Personalized',
+            author: 'Inspirational',
+            category: getCategoryForEmotion(emotion),
             emotion,
           });
         } else if (Array.isArray(quoteData)) {
-          quoteData.forEach((q: any, idx: number) => {
+          quoteData.forEach((q: unknown, idx: number) => {
+            const quoteObj = typeof q === 'object' && q !== null ? (q as Record<string, unknown>) : null;
             quotes.push({
               id: `api-${idx}`,
-              text: typeof q === 'string' ? q : q.text || q.quote || '',
-              author: (typeof q === 'object' ? q.author : '') || 'Inspirational',
-              category: (typeof q === 'object' ? q.category : '') || 'Personalized',
+              text: typeof q === 'string' ? q : String(quoteObj?.text || quoteObj?.quote || ''),
+              author: String(quoteObj?.author || 'Inspirational'),
+              category: String(quoteObj?.category || getCategoryForEmotion(emotion)),
               emotion,
             });
           });
@@ -128,21 +196,27 @@ export default function QuotesPage() {
 
         if (quotes.length > 0) {
           setApiQuotes(quotes);
-          // Merge: API quotes first, then fallback
-          setAllQuotes([...quotes, ...FALLBACK_QUOTES]);
+          // Merge: API quotes first, then emotion-matched fallback quotes only.
+          setAllQuotes([...quotes, ...getFallbackQuotesForEmotion(emotion)]);
           setDailyQuote(quotes[0]);
         } else {
           setUsingFallback(true);
-          setAllQuotes(FALLBACK_QUOTES);
+          const fallback = getFallbackQuotesForEmotion(emotion);
+          setAllQuotes(fallback);
+          setDailyQuote(fallback[0] || FALLBACK_QUOTES[0]);
         }
       } else {
         setUsingFallback(true);
-        setAllQuotes(FALLBACK_QUOTES);
+        const fallback = getFallbackQuotesForEmotion(emotion);
+        setAllQuotes(fallback);
+        setDailyQuote(fallback[0] || FALLBACK_QUOTES[0]);
       }
     } catch (err) {
       console.error('Failed to fetch personalized quotes:', err);
       setUsingFallback(true);
-      setAllQuotes(FALLBACK_QUOTES);
+      const fallback = getFallbackQuotesForEmotion(emotion);
+      setAllQuotes(fallback);
+      setDailyQuote(fallback[0] || FALLBACK_QUOTES[0]);
     } finally {
       setIsLoading(false);
     }
@@ -201,7 +275,6 @@ export default function QuotesPage() {
       case 'Gratitude': return 'bg-green-100 text-green-700';
       case 'Confidence': return 'bg-pink-100 text-pink-700';
       case 'Comfort': return 'bg-teal-100 text-teal-700';
-      case 'Personalized': return 'bg-indigo-100 text-indigo-700';
       default: return 'bg-gray-100 text-gray-700';
     }
   };
@@ -234,46 +307,22 @@ export default function QuotesPage() {
             for personalization.
           </div>
         )}
-        {urlEmotion && !usingFallback && !isLoading && (
+        {predictedEmotionLabel && !usingFallback && !isLoading && (
           <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-indigo-200/80 bg-indigo-50/90 px-3 py-2 text-xs text-indigo-900 sm:text-sm">
             <span>✨</span>
             <span>
-              For <strong className="capitalize">{urlEmotion}</strong> from your check-in.
+              For <strong className="capitalize">{predictedEmotionLabel}</strong> from your check-in.
             </span>
-            <a href="/quotes" className="ml-auto shrink-0 text-[11px] font-medium text-indigo-600 hover:underline">
-              Clear
-            </a>
           </div>
         )}
 
-        {urlEmotion ? (
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span className="text-[11px] font-medium text-neutral-500 sm:text-xs">Mood</span>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-neutral-900 bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white shadow-sm">
-              <span>{EMOTION_OPTIONS.find(e => e.key === selectedEmotion)?.emoji}</span>
-              {EMOTION_OPTIONS.find(e => e.key === selectedEmotion)?.label}
-            </span>
-          </div>
-        ) : (
-          <div className="mb-4 flex flex-wrap items-center gap-1.5">
-            <span className="basis-full text-[11px] font-medium text-neutral-500 sm:basis-auto sm:text-xs">Mood</span>
-            {EMOTION_OPTIONS.map((emo) => (
-              <button
-                key={emo.key}
-                type="button"
-                onClick={() => setSelectedEmotion(emo.key)}
-                className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-medium transition-all sm:px-3 sm:py-1.5 sm:text-sm ${
-                  selectedEmotion === emo.key
-                    ? 'border-neutral-900 bg-neutral-900 text-white shadow-sm'
-                    : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300'
-                }`}
-              >
-                <span>{emo.emoji}</span>
-                {emo.label}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-medium text-neutral-500 sm:text-xs">Mood</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-neutral-900 bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white shadow-sm">
+            <span>{EMOTION_META[selectedEmotion]?.emoji || '😌'}</span>
+            {EMOTION_META[selectedEmotion]?.label || 'Calm'}
+          </span>
+        </div>
 
         <div className="grid gap-4 lg:grid-cols-[1fr_minmax(0,240px)] lg:gap-5">
           <div className="order-1 space-y-4 lg:order-none">
@@ -287,7 +336,7 @@ export default function QuotesPage() {
                     <div className="flex min-w-0 items-center gap-2">
                       <Sparkles className="h-4 w-4 shrink-0 text-amber-300" />
                       <span className="truncate text-[10px] font-semibold uppercase tracking-wide text-neutral-300 sm:text-xs">
-                        {apiQuotes.length > 0 ? 'Personalized' : 'Featured'}
+                        {apiQuotes.length > 0 ? 'For You' : 'Featured'}
                       </span>
                     </div>
                     <button

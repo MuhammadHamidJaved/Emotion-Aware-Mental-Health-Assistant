@@ -3,19 +3,19 @@ Calendar API endpoints for mood calendar view
 """
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
 from rest_framework import status
-from django.db.models import Count, Q, Avg
 from django.utils import timezone
-from datetime import timedelta, date
+from datetime import date
 from collections import Counter
 import logging
+from .analytics_constants import CALENDAR_EMOTION_TO_SCORE
+from .services.response_helpers import error_response, ok_response
+from .repositories.entry_analytics_repository import EntryAnalyticsRepository
 import calendar
 
 logger = logging.getLogger(__name__)
 
 try:
-    from .models import CheckInEntry
     from emotions.models import EmotionDetection
 except ImportError as e:
     logger.error(f"Import error: {e}")
@@ -41,17 +41,6 @@ EMOTION_EMOJI = {
     'disgusted': '🤢',
     'fearful': '😨',
 }
-
-# Emotion to score mapping (for mood calculation)
-EMOTION_TO_SCORE = {
-    'happy': 90, 'excited': 85, 'grateful': 88, 'confident': 82,
-    'calm': 75, 'peaceful': 80, 'energetic': 85, 'loved': 87,
-    'neutral': 50, 'tired': 40,
-    'sad': 30, 'anxious': 35, 'angry': 25, 'frustrated': 30,
-    'lonely': 35, 'scared': 30, 'disappointed': 35,
-    'surprised': 60, 'disgusted': 20, 'fearful': 25
-}
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -84,12 +73,11 @@ def calendar_month(request):
         last_day = date(year, month, last_day_num)
         
         # Get all entries for this month
-        entries = CheckInEntry.objects.filter(
+        entries = EntryAnalyticsRepository.get_entries_by_day_range_ordered(
             user=user,
-            is_draft=False,
-            entry_date__date__gte=first_day,
-            entry_date__date__lte=last_day
-        ).order_by('entry_date')
+            first_day=first_day,
+            last_day=last_day,
+        )
         
         # Group entries by date
         calendar_data = {}
@@ -115,9 +103,10 @@ def calendar_month(request):
             
             # Try to get from EmotionDetection if no emotion on entry
             if not emotion:
-                detection = EmotionDetection.objects.filter(entry=entry).first()
-                if detection:
-                    emotion = detection.get_dominant_emotion()
+                emotion = EntryAnalyticsRepository.get_entry_dominant_emotion(
+                    entry=entry,
+                    emotion_detection_model=EmotionDetection,
+                )
             
             if emotion:
                 calendar_data[date_str]['emotions'].append(emotion)
@@ -139,7 +128,7 @@ def calendar_month(request):
             emoji = EMOTION_EMOJI.get(dominant_emotion, '😐')
             
             # Calculate average mood score
-            scores = [EMOTION_TO_SCORE.get(e, 50) for e in emotions]
+            scores = [CALENDAR_EMOTION_TO_SCORE.get(e, 50) for e in emotions]
             mood_score = int(sum(scores) / len(scores)) if scores else 50
             
             result[date_str] = {
@@ -150,11 +139,11 @@ def calendar_month(request):
                 'moodScore': mood_score
             }
         
-        return Response(result, status=status.HTTP_200_OK)
+        return ok_response(result)
         
     except Exception as e:
         logger.error(f"Error in calendar_month: {e}")
-        return Response({}, status=status.HTTP_200_OK)
+        return ok_response({})
 
 
 @api_view(['GET'])
@@ -171,25 +160,25 @@ def calendar_day_details(request):
     try:
         date_str = request.query_params.get('date')
         if not date_str:
-            return Response({'error': 'Date parameter required'}, status=status.HTTP_400_BAD_REQUEST)
+            return error_response('Date parameter required', status.HTTP_400_BAD_REQUEST)
         
         target_date = date.fromisoformat(date_str)
         
         # Get entries for this date
-        entries = CheckInEntry.objects.filter(
+        entries = EntryAnalyticsRepository.get_entries_for_day_ordered(
             user=user,
-            is_draft=False,
-            entry_date__date=target_date
-        ).order_by('entry_date')
+            target_date=target_date,
+        )
         
         result = []
         for entry in entries:
             # Get emotion
             emotion = getattr(entry, 'emotion', None)
             if not emotion:
-                detection = EmotionDetection.objects.filter(entry=entry).first()
-                if detection:
-                    emotion = detection.get_dominant_emotion()
+                emotion = EntryAnalyticsRepository.get_entry_dominant_emotion(
+                    entry=entry,
+                    emotion_detection_model=EmotionDetection,
+                )
             
             # Get decrypted content
             try:
@@ -212,13 +201,13 @@ def calendar_day_details(request):
                 'word_count': entry.word_count,
             })
         
-        return Response(result, status=status.HTTP_200_OK)
+        return ok_response(result)
         
     except ValueError as e:
-        return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, status=status.HTTP_400_BAD_REQUEST)
+        return error_response('Invalid date format. Use YYYY-MM-DD', status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.error(f"Error in calendar_day_details: {e}")
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return error_response(str(e), status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
@@ -247,46 +236,45 @@ def calendar_month_summary(request):
         last_day = date(year, month, last_day_num)
         
         # Get all entries for this month
-        entries = CheckInEntry.objects.filter(
+        entries = EntryAnalyticsRepository.get_entries_by_day_range_ordered(
             user=user,
-            is_draft=False,
-            entry_date__date__gte=first_day,
-            entry_date__date__lte=last_day
+            first_day=first_day,
+            last_day=last_day,
         )
         
         total_entries = entries.count()
         
         # Get unique days with entries
-        days_with_entries = entries.values_list('entry_date__date', flat=True).distinct()
-        days_logged = len(set(days_with_entries))
+        days_logged = EntryAnalyticsRepository.get_distinct_logged_days_count(entries)
         
         # Calculate average mood score
         mood_scores = []
         for entry in entries:
             emotion = getattr(entry, 'emotion', None)
             if not emotion:
-                detection = EmotionDetection.objects.filter(entry=entry).first()
-                if detection:
-                    emotion = detection.get_dominant_emotion()
+                emotion = EntryAnalyticsRepository.get_entry_dominant_emotion(
+                    entry=entry,
+                    emotion_detection_model=EmotionDetection,
+                )
             
-            if emotion and emotion in EMOTION_TO_SCORE:
-                mood_scores.append(EMOTION_TO_SCORE[emotion])
+            if emotion and emotion in CALENDAR_EMOTION_TO_SCORE:
+                mood_scores.append(CALENDAR_EMOTION_TO_SCORE[emotion])
         
         avg_mood_score = int(sum(mood_scores) / len(mood_scores)) if mood_scores else 0
         
-        return Response({
+        return ok_response({
             'total_entries': total_entries,
             'days_logged': days_logged,
             'avg_mood_score': avg_mood_score
-        }, status=status.HTTP_200_OK)
+        })
         
     except Exception as e:
         logger.error(f"Error in calendar_month_summary: {e}")
-        return Response({
+        return ok_response({
             'total_entries': 0,
             'days_logged': 0,
             'avg_mood_score': 0
-        }, status=status.HTTP_200_OK)
+        })
 
 
 

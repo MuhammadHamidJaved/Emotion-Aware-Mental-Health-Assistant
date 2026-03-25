@@ -180,3 +180,74 @@ class OnboardingSerializer(serializers.Serializer):
         return value
 
 
+class RecommendationSettingsPatchSerializer(serializers.Serializer):
+    """Validation boundary for recommendation settings updates."""
+
+    music_language = serializers.CharField(required=False, allow_blank=True)
+    music_genres = serializers.ListField(
+        child=serializers.CharField(max_length=50),
+        required=False,
+        allow_empty=True,
+    )
+    favorite_artists = serializers.ListField(
+        child=serializers.CharField(max_length=100),
+        required=False,
+        allow_empty=True,
+    )
+    market = serializers.CharField(required=False, allow_blank=True)
+    fitness_level = serializers.ChoiceField(
+        choices=['beginner', 'moderate', 'advanced'],
+        required=False,
+    )
+    age_group = serializers.ChoiceField(
+        choices=['teen', 'young_adult', 'adult', 'senior'],
+        required=False,
+        allow_null=True,
+    )
+    content_language = serializers.CharField(required=False, allow_blank=True)
+
+    def validate_favorite_artists(self, value):
+        if len(value) > 3:
+            raise serializers.ValidationError('Maximum 3 favorite artists allowed.')
+        return value
+
+
+class ProfileSettingsPatchSerializer(serializers.Serializer):
+    """Validation boundary for profile settings update payload."""
+
+    first_name = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    last_name = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    bio = serializers.CharField(required=False, allow_blank=True, max_length=500)
+    phone_number = serializers.CharField(required=False, allow_blank=True, max_length=20)
+    profile_picture = serializers.ImageField(required=False, allow_null=True)
+
+
+class NotificationSettingsPatchSerializer(serializers.Serializer):
+    """Validation boundary for notification settings update payload."""
+
+    session_reminders = serializers.BooleanField(required=False)
+    mood_insights = serializers.BooleanField(required=False)
+    weekly_reports = serializers.BooleanField(required=False)
+    streak_alerts = serializers.BooleanField(required=False)
+    ai_suggestions = serializers.BooleanField(required=False)
+    email_notifications = serializers.BooleanField(required=False)
+    push_notifications = serializers.BooleanField(required=False)
+
+
+class PrivacySettingsPatchSerializer(serializers.Serializer):
+    """Validation boundary for privacy settings update payload."""
+
+    data_collection = serializers.BooleanField(required=False)
+    share_analytics = serializers.BooleanField(required=False)
+    cloud_backup = serializers.BooleanField(required=False)
+    storage_type = serializers.ChoiceField(choices=['cloud', 'local', 'hybrid'], required=False)
+
+
+class AppearanceSettingsPatchSerializer(serializers.Serializer):
+    """Validation boundary for appearance settings update payload."""
+
+    mood_adaptive = serializers.BooleanField(required=False)
+    dark_mode = serializers.BooleanField(required=False)
+    color_scheme = serializers.ChoiceField(choices=['default', 'warm', 'cool'], required=False)
+
+

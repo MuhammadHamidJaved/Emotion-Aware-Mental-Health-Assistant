@@ -1,22 +1,21 @@
 """
 Insights & Analytics API endpoints
 """
+import logging
+from datetime import timedelta
+
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework import status
-from django.db.models import Count, Q, Avg, Max, Sum
 from django.utils import timezone
-from datetime import timedelta
-from collections import Counter
-import logging
+
+from .analytics_constants import INSIGHTS_EMOTION_SCORE_MAP
+from .repositories.entry_analytics_repository import EntryAnalyticsRepository
+from .services.response_helpers import ok_response
 
 logger = logging.getLogger(__name__)
 
 try:
-    from .models import CheckInEntry
     from emotions.models import EmotionDetection
-    from users.models import User
 except ImportError as e:
     logger.error(f"Import error: {e}")
 
@@ -46,19 +45,17 @@ def insights_overview(request):
         previous_start_date = start_date - timedelta(days=days)
         
         # Get entries for current period
-        current_entries = CheckInEntry.objects.filter(
+        current_entries = EntryAnalyticsRepository.get_entries_in_period(
             user=user,
-            is_draft=False,
-            entry_date__gte=start_date,
-            entry_date__lte=end_date
+            start_date=start_date,
+            end_date=end_date,
         )
         
         # Get entries for previous period (for comparison)
-        previous_entries = CheckInEntry.objects.filter(
+        previous_entries = EntryAnalyticsRepository.get_entries_in_half_open_period(
             user=user,
-            is_draft=False,
-            entry_date__gte=previous_start_date,
-            entry_date__lt=start_date
+            start_date=previous_start_date,
+            end_date=start_date,
         )
         
         # Calculate overall mood score (0-100)
@@ -66,10 +63,10 @@ def insights_overview(request):
         mood_scores = []
         
         # Get mood scores from detections (valence -1 to 1, convert to 0-100)
-        emotion_detections = EmotionDetection.objects.filter(
-            entry__user=user,
-            entry__is_draft=False,
-            detected_at__gte=start_date
+        emotion_detections = EntryAnalyticsRepository.get_emotion_detections_since(
+            user=user,
+            start_date=start_date,
+            emotion_detection_model=EmotionDetection,
         )
         
         if emotion_detections.exists():
@@ -79,18 +76,10 @@ def insights_overview(request):
                 mood_scores.append(score)
         else:
             # Fallback: use emotion field from entries
-            entries_with_emotions = current_entries.exclude(
-                emotion__isnull=True
-            ).exclude(emotion='')
+            entries_with_emotions = EntryAnalyticsRepository.get_entries_with_emotions(current_entries)
             
             # Map emotions to scores (rough approximation)
-            emotion_to_score = {
-                'happy': 90, 'excited': 85, 'grateful': 88, 'confident': 82,
-                'calm': 75, 'peaceful': 80, 'energetic': 85, 'loved': 87,
-                'neutral': 50, 'tired': 40,
-                'sad': 30, 'anxious': 35, 'angry': 25, 'frustrated': 30,
-                'lonely': 35, 'scared': 30, 'disappointed': 35
-            }
+            emotion_to_score = INSIGHTS_EMOTION_SCORE_MAP
             
             for entry in entries_with_emotions:
                 emotion = getattr(entry, 'emotion', None)
@@ -101,11 +90,11 @@ def insights_overview(request):
         
         # Calculate previous period mood for comparison
         prev_mood_scores = []
-        prev_detections = EmotionDetection.objects.filter(
-            entry__user=user,
-            entry__is_draft=False,
-            detected_at__gte=previous_start_date,
-            detected_at__lt=start_date
+        prev_detections = EntryAnalyticsRepository.get_emotion_detections_in_half_open_period(
+            user=user,
+            start_date=previous_start_date,
+            end_date=start_date,
+            emotion_detection_model=EmotionDetection,
         )
         
         if prev_detections.exists():
@@ -113,16 +102,8 @@ def insights_overview(request):
                 score = ((detection.valence + 1) / 2) * 100
                 prev_mood_scores.append(score)
         else:
-            prev_entries_with_emotions = previous_entries.exclude(
-                emotion__isnull=True
-            ).exclude(emotion='')
-            emotion_to_score = {
-                'happy': 90, 'excited': 85, 'grateful': 88, 'confident': 82,
-                'calm': 75, 'peaceful': 80, 'energetic': 85, 'loved': 87,
-                'neutral': 50, 'tired': 40,
-                'sad': 30, 'anxious': 35, 'angry': 25, 'frustrated': 30,
-                'lonely': 35, 'scared': 30, 'disappointed': 35
-            }
+            prev_entries_with_emotions = EntryAnalyticsRepository.get_entries_with_emotions(previous_entries)
+            emotion_to_score = INSIGHTS_EMOTION_SCORE_MAP
             for entry in prev_entries_with_emotions:
                 emotion = getattr(entry, 'emotion', None)
                 if emotion and emotion in emotion_to_score:
@@ -134,9 +115,7 @@ def insights_overview(request):
         # Calculate positive trend percentage
         positive_emotions = ['happy', 'excited', 'grateful', 'confident', 'calm', 'peaceful', 'energetic', 'loved']
         
-        entries_with_emotions = current_entries.exclude(
-            emotion__isnull=True
-        ).exclude(emotion='')
+        entries_with_emotions = EntryAnalyticsRepository.get_entries_with_emotions(current_entries)
         
         total_with_emotions = entries_with_emotions.count()
         positive_count = entries_with_emotions.filter(emotion__in=positive_emotions).count()
@@ -151,12 +130,11 @@ def insights_overview(request):
         # Calculate best streak - optimized version
         # Get all entry dates for the last 90 days (reduced from 365 for performance)
         streak_start_date = end_date - timedelta(days=90)
-        entry_dates = CheckInEntry.objects.filter(
+        entry_dates = EntryAnalyticsRepository.get_entry_dates_in_period(
             user=user,
-            is_draft=False,
-            entry_date__gte=streak_start_date,
-            entry_date__lte=end_date
-        ).values_list('entry_date__date', flat=True).distinct().order_by('-entry_date__date')
+            start_date=streak_start_date,
+            end_date=end_date,
+        )
         
         # Convert to set for O(1) lookup
         entry_dates_set = set(entry_dates)
@@ -175,26 +153,26 @@ def insights_overview(request):
             
             check_date -= timedelta(days=1)
         
-        return Response({
+        return ok_response({
             'overall_mood': overall_mood,
             'overall_mood_change': overall_mood_change,
             'positive_trend': positive_trend,
             'positive_trend_status': positive_trend_status,
             'avg_entries_per_day': avg_entries_per_day,
             'best_streak': best_streak
-        }, status=status.HTTP_200_OK)
+        })
         
     except Exception as e:
         logger.error(f"Error in insights_overview: {e}")
         # Return default values on error
-        return Response({
+        return ok_response({
             'overall_mood': 50,
             'overall_mood_change': 0,
             'positive_trend': 50,
             'positive_trend_status': 'Neutral',
             'avg_entries_per_day': 0,
             'best_streak': 0
-        }, status=status.HTTP_200_OK)
+        })
 
 
 @api_view(['GET'])
@@ -216,19 +194,11 @@ def insights_mood_timeline(request):
     try:
         start_date = timezone.now() - timedelta(days=days)
         
-        # Get emotion detections with select_related for optimization
-        detections = EmotionDetection.objects.filter(
-            entry__user=user,
-            entry__is_draft=False,
-            detected_at__gte=start_date
-        ).select_related('entry')
-        
-        # Group detections by date for efficient lookup
-        from collections import defaultdict
-        detections_by_date = defaultdict(list)
-        for detection in detections:
-            date_key = detection.detected_at.date()
-            detections_by_date[date_key].append(detection)
+        detections_by_date = EntryAnalyticsRepository.get_insights_timeline_detections_by_date(
+            user=user,
+            start_date=start_date,
+            emotion_detection_model=EmotionDetection,
+        )
         
         result = []
         
@@ -257,23 +227,14 @@ def insights_mood_timeline(request):
                 })
             else:
                 # No data - check if we can infer from entries
-                entries_today = CheckInEntry.objects.filter(
+                entries_today = EntryAnalyticsRepository.get_entries_with_emotions_for_day(
                     user=user,
-                    is_draft=False,
-                    entry_date__date=date
-                ).exclude(
-                    emotion__isnull=True
-                ).exclude(emotion='')
+                    target_date=date,
+                )
                 
                 if entries_today.exists():
                     # Estimate from emotions
-                    emotion_to_score = {
-                        'happy': 90, 'excited': 85, 'grateful': 88, 'confident': 82,
-                        'calm': 75, 'peaceful': 80, 'energetic': 85, 'loved': 87,
-                        'neutral': 50, 'tired': 40,
-                        'sad': 30, 'anxious': 35, 'angry': 25, 'frustrated': 30,
-                        'lonely': 35, 'scared': 30, 'disappointed': 35
-                    }
+                    emotion_to_score = INSIGHTS_EMOTION_SCORE_MAP
                     
                     scores = []
                     for entry in entries_today:
@@ -310,7 +271,7 @@ def insights_mood_timeline(request):
                         'avgScore': 50.0
                     })
         
-        return Response(result, status=status.HTTP_200_OK)
+        return ok_response(result)
         
     except Exception as e:
         logger.error(f"Error in insights_mood_timeline: {e}")
@@ -324,5 +285,5 @@ def insights_mood_timeline(request):
                 'arousal': 5.0,
                 'avgScore': 50.0
             })
-        return Response(result, status=status.HTTP_200_OK)
+        return ok_response(result)
 

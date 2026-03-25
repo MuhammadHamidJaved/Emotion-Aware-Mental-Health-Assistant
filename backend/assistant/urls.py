@@ -14,6 +14,7 @@ urlpatterns = [
     path('assistant/emotion/detect/', views.detect_emotion_from_image, name='assistant-emotion-detect'),
     path('assistant/emotion/detect/7class/', views.detect_emotion_from_image_7class, name='assistant-emotion-detect-7class'),
     path('assistant/emotion/detect/text/', views.detect_emotion_from_text, name='assistant-emotion-detect-text'),
+    path('assistant/emotion/detect/audio/', views.detect_emotion_from_audio, name='assistant-emotion-detect-audio'),
     
     # Dashboard endpoints
     path('dashboard/stats/', dashboard_views.dashboard_stats, name='dashboard-stats'),

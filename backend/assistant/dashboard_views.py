@@ -1,22 +1,20 @@
 """
 Dashboard API endpoints for statistics and analytics
 """
+import logging
+from datetime import timedelta
+
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework import status
-from django.db.models import Count, Q, Avg, Max
-from django.db.models.functions import Lower, Trim
-from django.db.models import QuerySet
 from django.utils import timezone
-from datetime import timedelta
-from collections import Counter
-import logging
+
+from .analytics_constants import DASHBOARD_EMOTION_TO_VALENCE_AROUSAL
+from .repositories.entry_analytics_repository import EntryAnalyticsRepository
+from .services.response_helpers import ok_response
 
 logger = logging.getLogger(__name__)
 
 try:
-    from .models import CheckInEntry
     from emotions.models import EmotionDetection
 except ImportError as e:
     logger.error(f"Import error: {e}")
@@ -39,7 +37,7 @@ def dashboard_stats(request):
     user = request.user
     
     # Total entries count
-    total_entries = CheckInEntry.objects.filter(user=user, is_draft=False).count()
+    total_entries = EntryAnalyticsRepository.get_total_entries(user)
     
     # Calculate current streak (consecutive days with at least one entry)
     # Optimized: Get all entry dates at once, then calculate streak in Python
@@ -47,12 +45,9 @@ def dashboard_stats(request):
     current_date = timezone.now().date()
     
     # Get all entry dates for the user (last 365 days to limit query)
-    entry_dates = set(
-        CheckInEntry.objects.filter(
-            user=user,
-            is_draft=False,
-            entry_date__gte=current_date - timedelta(days=365)
-        ).values_list('entry_date__date', flat=True).distinct()
+    entry_dates = EntryAnalyticsRepository.get_entry_dates_since(
+        user=user,
+        start_date=current_date - timedelta(days=365),
     )
     
     # Calculate streak by checking consecutive days
@@ -75,18 +70,11 @@ def dashboard_stats(request):
     # Optimized: Use database aggregation instead of loading all entries
     dominant_emotion = 'neutral'
     try:
-        from django.db.models import Count
-        emotion_counts = CheckInEntry.objects.filter(
+        dominant_emotion = EntryAnalyticsRepository.get_dominant_emotion_since(
             user=user,
-            is_draft=False,
-            entry_date__gte=timezone.now() - timedelta(days=30),
-            emotion__isnull=False
-        ).exclude(emotion='').values('emotion').annotate(
-            count=Count('emotion')
-        ).order_by('-count')[:1]
-        
-        if emotion_counts:
-            dominant_emotion = emotion_counts[0]['emotion']
+            start_date=timezone.now() - timedelta(days=30),
+            default='neutral',
+        )
     except Exception as e:
         # Field doesn't exist yet, use default
         logger.warning(f"Emotion field not available yet: {e}")
@@ -94,33 +82,17 @@ def dashboard_stats(request):
     
     # ML predictions count (total emotion detections)
     # First try to count EmotionDetection records
-    if EmotionDetection:
-        try:
-            ml_predictions_count = EmotionDetection.objects.filter(
-                entry__user=user
-            ).count()
-        except Exception as e:
-            logger.warning(f"Error counting EmotionDetection records: {e}")
-            # Fallback: count entries with emotions
-            ml_predictions_count = CheckInEntry.objects.filter(
-                user=user,
-                is_draft=False,
-                emotion__isnull=False
-            ).exclude(emotion='').count()
-    else:
-        # Fallback: count entries with emotions if EmotionDetection model doesn't exist
-        ml_predictions_count = CheckInEntry.objects.filter(
-            user=user,
-            is_draft=False,
-            emotion__isnull=False
-        ).exclude(emotion='').count()
+    ml_predictions_count = EntryAnalyticsRepository.get_ml_predictions_count(
+        user=user,
+        emotion_detection_model=EmotionDetection,
+    )
     
-    return Response({
+    return ok_response({
         'total_entries': total_entries,
         'current_streak': streak,
         'dominant_emotion': dominant_emotion,
         'ml_predictions_count': ml_predictions_count
-    }, status=status.HTTP_200_OK)
+    })
 
 
 @api_view(['GET'])
@@ -138,72 +110,16 @@ def mood_trend(request):
     user = request.user
     days = int(request.query_params.get('days', 7))
     
-    # Get entries from last N days
+    # Get entries/detections and grouped maps from repository.
     start_date = timezone.now() - timedelta(days=days)
-    entries = CheckInEntry.objects.filter(
+    detections_by_date, entries_by_date = EntryAnalyticsRepository.get_mood_trend_source_data(
         user=user,
-        is_draft=False,
-        entry_date__gte=start_date
+        start_date=start_date,
+        emotion_detection_model=EmotionDetection,
     )
-    
-    # Get emotion detections for these entries
-    detections = EmotionDetection.objects.filter(
-        entry__user=user,
-        detected_at__gte=start_date
-    )
-    
-    # Optimized: Get all detections and entries at once, then group by date in Python
-    # This reduces the number of database queries from N (one per day) to 2 (one for detections, one for entries)
-    detections_list = list(detections.select_related('entry'))
-    entries_list = list(entries.exclude(emotion='').exclude(emotion__isnull=True))
-    
-    # Group detections by date
-    detections_by_date = {}
-    for detection in detections_list:
-        # Check both detected_at and entry date
-        date1 = detection.detected_at.date() if detection.detected_at else None
-        date2 = detection.entry.entry_date.date() if detection.entry and detection.entry.entry_date else None
-        
-        for date in [date1, date2]:
-            if date:
-                if date not in detections_by_date:
-                    detections_by_date[date] = []
-                detections_by_date[date].append(detection)
-    
-    # Group entries by date
-    entries_by_date = {}
-    for entry in entries_list:
-        date = entry.entry_date.date() if entry.entry_date else None
-        if date:
-            if date not in entries_by_date:
-                entries_by_date[date] = []
-            entries_by_date[date].append(entry)
     
     # Emotion mapping for fallback calculation
-    emotion_to_valence_arousal = {
-        'happy': (0.8, 0.7),
-        'sad': (-0.6, 0.3),
-        'angry': (-0.4, 0.9),
-        'anxious': (-0.5, 0.8),
-        'calm': (0.2, 0.2),
-        'excited': (0.7, 0.9),
-        'neutral': (0.0, 0.3),
-        'surprised': (0.3, 0.9),
-        'surprise': (0.3, 0.9),
-        'fearful': (-0.7, 0.9),
-        'disgusted': (-0.5, 0.6),
-        'contempt': (-0.3, 0.4),
-        'frustrated': (-0.4, 0.8),
-        'grateful': (0.7, 0.5),
-        'loved': (0.9, 0.6),
-        'confident': (0.6, 0.7),
-        'tired': (-0.2, 0.2),
-        'lonely': (-0.5, 0.3),
-        'scared': (-0.6, 0.9),
-        'disappointed': (-0.4, 0.4),
-        'energetic': (0.6, 0.9),
-        'peaceful': (0.3, 0.2),
-    }
+    emotion_to_valence_arousal = DASHBOARD_EMOTION_TO_VALENCE_AROUSAL
     
     # Build result for each day
     result = []
@@ -272,7 +188,7 @@ def mood_trend(request):
                 'avgArousal': 5.0
             })
     
-    return Response(result, status=status.HTTP_200_OK)
+    return ok_response(result)
 
 
 @api_view(['GET'])
@@ -293,33 +209,14 @@ def emotion_distribution(request):
     start_date = timezone.now() - timedelta(days=days)
     
     try:
-        # Optimized: Use database aggregation instead of loading all entries into memory
-        # Get emotion counts using database aggregation
-        # Note: Using Lower() for case-insensitive grouping
-        emotion_counts = CheckInEntry.objects.filter(
-            user=user,
-            is_draft=False,
-            entry_date__gte=start_date,
-            emotion__isnull=False
-        ).exclude(emotion='').annotate(
-            emotion_lower=Lower('emotion')
-        ).values('emotion_lower').annotate(
-            count=Count('id')
-        ).order_by('-count')
-        
-        # Convert to array format and trim whitespace
-        result = [
-            {'emotion': item['emotion_lower'].strip() if item['emotion_lower'] else '', 'count': item['count']}
-            for item in emotion_counts
-            if item['emotion_lower'] and item['emotion_lower'].strip()  # Filter out None/empty values
-        ]
+        result = EntryAnalyticsRepository.get_emotion_distribution(user=user, start_date=start_date)
         
         logger.info(f"Emotion distribution for user {user.id}: {result}")
-        return Response(result, status=status.HTTP_200_OK)
+        return ok_response(result)
     except Exception as e:
         # Field doesn't exist yet, return empty array
         logger.warning(f"Emotion field not available yet: {e}")
-        return Response([], status=status.HTTP_200_OK)
+        return ok_response([])
 
 
 @api_view(['GET'])
@@ -335,19 +232,14 @@ def recent_entries(request):
         user = request.user
         limit = int(request.query_params.get('limit', 5))
         
-        entries = CheckInEntry.objects.filter(
-            user=user,
-            is_draft=False
-        ).select_related().prefetch_related('emotion_detections').order_by('-entry_date')[:limit]
+        entries = EntryAnalyticsRepository.get_recent_entries_for_user(user=user, limit=limit)
         
         # Optimized: Get all emotion detections in one query to avoid N+1
         entry_ids = [entry.id for entry in entries]
-        detections = {}
-        if EmotionDetection and entry_ids:
-            for detection in EmotionDetection.objects.filter(entry_id__in=entry_ids).select_related('entry'):
-                entry_id = detection.entry_id
-                if entry_id not in detections or detection.detected_at > detections[entry_id].detected_at:
-                    detections[entry_id] = detection
+        detections = EntryAnalyticsRepository.get_latest_detections_for_entry_ids(
+            entry_ids=entry_ids,
+            emotion_detection_model=EmotionDetection,
+        )
         
         result = []
         for entry in entries:
@@ -402,12 +294,12 @@ def recent_entries(request):
                 except:
                     continue
         
-        return Response(result, status=status.HTTP_200_OK)
+        return ok_response(result)
     except Exception as e:
         import traceback
         error_msg = str(e)
         logger.error(f"Error in recent_entries endpoint: {error_msg}")
         traceback.print_exc()
         # Return empty array instead of error if there's an issue, so dashboard still loads
-        return Response([], status=status.HTTP_200_OK)
+        return ok_response([])
 

@@ -1,20 +1,35 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Music, Dumbbell, Quote, Play, Check, Clock, TrendingUp, Sparkles, BookmarkPlus, Bookmark, Brain, Loader2, ExternalLink } from 'lucide-react';
 
 import MusicPlayer from '@/components/MusicPlayer';
-import { apiGetPersonalizedRecommendations, apiSendRecommendationFeedback } from '@/lib/api';
+import { apiSendRecommendationFeedback } from '@/lib/api';
 
-const EMOTION_OPTIONS = [
-  { key: 'happy', label: 'Happy', emoji: '😊' },
-  { key: 'sad', label: 'Sad', emoji: '😢' },
-  { key: 'anxious', label: 'Anxious', emoji: '😰' },
-  { key: 'calm', label: 'Calm', emoji: '😌' },
-  { key: 'tired', label: 'Tired', emoji: '😴' },
-  { key: 'frustrated', label: 'Frustrated', emoji: '😤' },
-  { key: 'energetic', label: 'Energetic', emoji: '⚡' },
-];
+function normalizeSpotifyLink(url?: string | null): string | null {
+  if (!url) return null;
+
+  if (url.includes('open.spotify.com/')) {
+    return url;
+  }
+
+  const uriMatch = url.match(/^spotify:(track|album|playlist):([A-Za-z0-9]+)$/);
+  if (uriMatch) {
+    return `https://open.spotify.com/${uriMatch[1]}/${uriMatch[2]}`;
+  }
+
+  const apiMatch = url.match(/api\.spotify\.com\/v1\/(tracks|albums|playlists)\/([A-Za-z0-9]+)/);
+  if (apiMatch) {
+    const typeMap: Record<string, string> = {
+      tracks: 'track',
+      albums: 'album',
+      playlists: 'playlist',
+    };
+    return `https://open.spotify.com/${typeMap[apiMatch[1]]}/${apiMatch[2]}`;
+  }
+
+  return null;
+}
 
 export default function PersonalizedRecommendationsPage() {
   const [bookmarkedMusic, setBookmarkedMusic] = useState<string[]>([]);
@@ -24,36 +39,10 @@ export default function PersonalizedRecommendationsPage() {
   const [recommendations, setRecommendations] = useState<any>(null);
   const [emotionData, setEmotionData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedEmotion, setSelectedEmotion] = useState<string>('');
 
   // Build emotion query param for sub-page links
   const emotionQuery = selectedEmotion ? `?emotion=${selectedEmotion}` : '';
-
-  // Fetch personalized recommendations from API
-  const fetchFromAPI = useCallback(async (emotion: string) => {
-    const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    if (!accessToken || !emotion) return false;
-
-    try {
-      const data = await apiGetPersonalizedRecommendations(accessToken, {
-        emotion,
-        types: ['music', 'exercise', 'quote'],
-      });
-
-      setRecommendations(data.recommendations || {});
-      setEmotionData({
-        dominant: data.emotion,
-        confidence: null,
-        lastUpdated: new Date().toLocaleString(),
-        source: 'api',
-      });
-      return true;
-    } catch (err) {
-      console.error('Failed to fetch recommendations from API:', err);
-      return false;
-    }
-  }, []);
 
   // Load recommendations from localStorage (set by emotion detection) or API
   useEffect(() => {
@@ -91,7 +80,7 @@ export default function PersonalizedRecommendationsPage() {
   let playlistUrl: string | null = null;
   
   if (musicData) {
-    playlistUrl = musicData.playlist_url || musicData.url || null;
+    playlistUrl = normalizeSpotifyLink(musicData.playlist_url || musicData.url || null);
     
     if (Array.isArray(musicData)) {
       musicTracks = musicData;
@@ -125,7 +114,7 @@ export default function PersonalizedRecommendationsPage() {
         bpm: track.bpm || 0,
         benefit: 'Personalized for your mood',
         coverColor: 'bg-purple-500',
-        url: track.url || track.external_urls?.spotify || track.href || track.uri,
+        url: normalizeSpotifyLink(track.external_urls?.spotify || track.url || track.uri || track.href) || undefined,
         preview_url: track.preview_url || track.preview || null,
         coverImage,
       });
@@ -267,24 +256,7 @@ export default function PersonalizedRecommendationsPage() {
         </div>
         <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
           <Sparkles className="w-12 h-12 mx-auto mb-4 text-gray-200" />
-          <p className="text-sm text-gray-600 mb-5">Choose a mood or detect an emotion to get personalized recommendations</p>
-          <div className="flex flex-wrap justify-center gap-2 mb-6">
-            {EMOTION_OPTIONS.map((emo) => (
-              <button
-                key={emo.key}
-                onClick={async () => {
-                  setSelectedEmotion(emo.key);
-                  setIsLoading(true);
-                  await fetchFromAPI(emo.key);
-                  setIsLoading(false);
-                }}
-                className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors text-sm font-medium"
-              >
-                <span>{emo.emoji}</span>
-                <span>{emo.label}</span>
-              </button>
-            ))}
-          </div>
+          <p className="text-sm text-gray-600 mb-5">Detect an emotion to get personalized recommendations</p>
           <a href="/check-in/new?type=video" className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
             Or go to Emotion Detection →
           </a>
@@ -306,7 +278,7 @@ export default function PersonalizedRecommendationsPage() {
         </div>
       </div>
 
-      {/* Emotion Status + Selector */}
+      {/* Emotion Status */}
       <div className="bg-white rounded-2xl border-2 p-4" style={{ borderColor: getEmotionColor(emotion) }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -323,36 +295,8 @@ export default function PersonalizedRecommendationsPage() {
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap gap-1 justify-end">
-            {EMOTION_OPTIONS.map((emo) => (
-              <button
-                key={emo.key}
-                onClick={async () => {
-                  setSelectedEmotion(emo.key);
-                  setIsRefreshing(true);
-                  await fetchFromAPI(emo.key);
-                  setIsRefreshing(false);
-                }}
-                className={`px-2 py-1 rounded-full text-xs font-medium transition-colors ${
-                  (selectedEmotion || emotion) === emo.key
-                    ? 'bg-black text-white'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                }`}
-                title={emo.label}
-              >
-                {emo.emoji}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
-
-      {isRefreshing && (
-        <div className="flex items-center justify-center py-4">
-          <Loader2 className="w-5 h-5 animate-spin text-gray-400 mr-2" />
-          <span className="text-sm text-gray-500">Fetching personalized recommendations...</span>
-        </div>
-      )}
 
       {/* Three Columns - Compact */}
       <div className="grid lg:grid-cols-3 gap-3">
@@ -378,6 +322,7 @@ export default function PersonalizedRecommendationsPage() {
                 <MusicPlayer
                   track={musicRecs[currentTrackIndex] || musicRecs[0]}
                   playlist={musicRecs.filter((t: any) => !t.isPlaylist)}
+                  hideArtist={true}
                   onNext={() => {
                     let nextIndex = currentTrackIndex + 1;
                     while (nextIndex < musicRecs.length && musicRecs[nextIndex]?.isPlaylist) {

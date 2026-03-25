@@ -96,3 +96,19 @@ class CheckInEntryCreateSerializer(serializers.Serializer):
             })
         
         return attrs
+
+
+class EmotionImageRequestSerializer(serializers.Serializer):
+    """Serializer for image-based emotion detection requests."""
+    image_data = serializers.CharField(required=True, allow_blank=False)
+
+
+class EmotionTextRequestSerializer(serializers.Serializer):
+    """Serializer for text-based emotion detection requests."""
+    text = serializers.CharField(required=True, allow_blank=False)
+
+    def validate_text(self, value):
+        cleaned = value.strip()
+        if not cleaned:
+            raise serializers.ValidationError('text is required')
+        return cleaned

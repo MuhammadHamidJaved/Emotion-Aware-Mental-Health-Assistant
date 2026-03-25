@@ -8,6 +8,7 @@ import { apiGetPersonalizedRecommendations, apiSendRecommendationFeedback, apiGe
 interface Exercise {
   id: string;
   name: string;
+  emotion: string;
   category: string;
   duration: string;
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
@@ -21,48 +22,56 @@ interface Exercise {
 // Fallback exercises when microservice is unavailable
 const FALLBACK_EXERCISES: Exercise[] = [
   {
+    emotion: 'calm',
     id: '1', name: 'Morning Yoga Flow', category: 'Yoga', duration: '15 min', difficulty: 'Beginner',
     benefits: ['Reduces stress', 'Improves flexibility', 'Boosts energy'],
     steps: ['Start in mountain pose, feet hip-width apart', 'Inhale, raise arms overhead in upward salute', 'Exhale, fold forward into standing forward bend', 'Inhale, lift halfway up, lengthen spine', 'Exhale, step back to downward-facing dog', 'Hold for 5 breaths, focusing on alignment', 'Walk feet forward, roll up to standing', 'Repeat 3-5 times'],
     calories: 80, icon: '🧘',
   },
   {
+    emotion: 'calm',
     id: '2', name: 'Mindful Walking', category: 'Cardio', duration: '20 min', difficulty: 'Beginner',
     benefits: ['Clears mind', 'Improves mood', 'Gentle exercise'],
     steps: ['Find a quiet walking path or park', 'Start walking at a comfortable pace', 'Focus on the sensation of your feet touching the ground', 'Notice your breathing rhythm', 'Observe your surroundings without judgment', 'If your mind wanders, gently bring attention back to walking', 'Maintain this mindful awareness for full duration', 'End with 5 deep breaths in standing position'],
     calories: 100, icon: '🚶',
   },
   {
+    emotion: 'anxious',
     id: '3', name: 'Breathing Exercises', category: 'Meditation', duration: '10 min', difficulty: 'Beginner',
     benefits: ['Reduces anxiety', 'Lowers heart rate', 'Improves focus'],
     steps: ['Sit comfortably with straight spine', 'Close your eyes or soften your gaze', 'Breathe in slowly through nose for 4 counts', 'Hold breath for 4 counts', 'Exhale slowly through mouth for 6 counts', 'Pause for 2 counts before next breath', 'Repeat this cycle 10 times', 'Return to natural breathing, notice how you feel'],
     calories: 20, icon: '🌬️',
   },
   {
+    emotion: 'energetic',
     id: '4', name: 'Strength Training', category: 'Strength', duration: '30 min', difficulty: 'Intermediate',
     benefits: ['Builds muscle', 'Boosts metabolism', 'Releases endorphins'],
     steps: ['Warm up with 5 minutes of light cardio', 'Push-ups: 3 sets of 10-15 reps', 'Squats: 3 sets of 15-20 reps', 'Lunges: 3 sets of 10 reps per leg', 'Plank hold: 3 sets of 30-60 seconds', 'Rest 60 seconds between sets', 'Cool down with gentle stretching', 'Hydrate and rest'],
     calories: 200, icon: '💪',
   },
   {
+    emotion: 'happy',
     id: '5', name: 'Dance Therapy', category: 'Cardio', duration: '25 min', difficulty: 'Beginner',
     benefits: ['Boosts mood', 'Fun exercise', 'Stress relief'],
     steps: ['Put on your favorite upbeat music', 'Start with gentle swaying to warm up', 'Let your body move freely to the rhythm', 'Try different movements: arms, legs, whole body', 'Don\'t worry about technique, just enjoy', 'Increase energy in the middle section', 'Slow down gradually toward the end', 'Finish with stretching and deep breaths'],
     calories: 180, icon: '💃',
   },
   {
+    emotion: 'calm',
     id: '6', name: 'Tai Chi Basics', category: 'Yoga', duration: '20 min', difficulty: 'Beginner',
     benefits: ['Improves balance', 'Reduces stress', 'Gentle movement'],
     steps: ['Stand with feet shoulder-width apart', 'Relax shoulders, soften knees', 'Begin "cloud hands" movement: shift weight side to side', 'Move arms in circular motion, following the body', 'Keep movements slow, smooth, continuous', 'Focus on breathing naturally', 'Practice "parting wild horse\'s mane" movement', 'End in standing meditation for 2 minutes'],
     calories: 90, icon: '🥋',
   },
   {
+    emotion: 'energetic',
     id: '7', name: 'HIIT Workout', category: 'Cardio', duration: '20 min', difficulty: 'Advanced',
     benefits: ['Burns calories fast', 'Boosts metabolism', 'Time-efficient'],
     steps: ['Warm up: 3 minutes light jogging', 'Jumping jacks: 45 seconds', 'Rest: 15 seconds', 'Burpees: 45 seconds', 'Rest: 15 seconds', 'Mountain climbers: 45 seconds', 'Rest: 15 seconds', 'Repeat circuit 4 times, cool down'],
     calories: 250, icon: '🔥',
   },
   {
+    emotion: 'anxious',
     id: '8', name: 'Progressive Muscle Relaxation', category: 'Meditation', duration: '15 min', difficulty: 'Beginner',
     benefits: ['Releases tension', 'Promotes sleep', 'Reduces anxiety'],
     steps: ['Lie down or sit comfortably', 'Close your eyes, take deep breaths', 'Tense feet muscles for 5 seconds, then release', 'Notice the difference between tension and relaxation', 'Move up to calves, tense and release', 'Continue with thighs, abdomen, arms, shoulders', 'Finish with face and jaw muscles', 'Rest for 2 minutes, feeling fully relaxed'],
@@ -74,15 +83,38 @@ const CATEGORY_ICONS: Record<string, string> = {
   Yoga: '🧘', Cardio: '🏃', Strength: '💪', Meditation: '🧠',
 };
 
-const EMOTION_OPTIONS = [
-  { key: 'all', label: 'All', emoji: '🌈' },
-  { key: 'happy', label: 'Happy', emoji: '😊' },
-  { key: 'calm', label: 'Calm', emoji: '😌' },
-  { key: 'sad', label: 'Sad', emoji: '😢' },
-  { key: 'anxious', label: 'Anxious', emoji: '😰' },
-  { key: 'energetic', label: 'Energetic', emoji: '⚡' },
-  { key: 'tired', label: 'Tired', emoji: '😴' },
-];
+const EMOTION_META: Record<string, { label: string; emoji: string }> = {
+  happy: { label: 'Happy', emoji: '😊' },
+  calm: { label: 'Calm', emoji: '😌' },
+  sad: { label: 'Sad', emoji: '😢' },
+  anxious: { label: 'Anxious', emoji: '😰' },
+  energetic: { label: 'Energetic', emoji: '⚡' },
+};
+
+const normalizeToExerciseEmotion = (emotion: string | null): string => {
+  const source = (emotion || '').toLowerCase().trim();
+  if (!source) return 'calm';
+  if (EMOTION_META[source]) return source;
+
+  const map: Record<string, string> = {
+    neutral: 'calm',
+    tired: 'calm',
+    peaceful: 'calm',
+    relaxed: 'calm',
+    frustrated: 'anxious',
+    fear: 'anxious',
+    angry: 'energetic',
+    lonely: 'sad',
+    disappointed: 'sad',
+    excited: 'energetic',
+    confident: 'energetic',
+    grateful: 'happy',
+  };
+  return map[source] || 'calm';
+};
+
+const getFallbackExercisesForEmotion = (emotion: string): Exercise[] =>
+  FALLBACK_EXERCISES.filter((exercise) => exercise.emotion === emotion);
 
 function apiExerciseToExercise(ex: ExerciseRecommendation, idx: number): Exercise {
   // Use the API's difficulty field if available, otherwise infer from category
@@ -99,6 +131,7 @@ function apiExerciseToExercise(ex: ExerciseRecommendation, idx: number): Exercis
   }
 
   return {
+    emotion: 'calm',
     id: `api-${idx}`,
     name: ex.name || 'Exercise',
     category: ex.category || 'General',
@@ -117,13 +150,14 @@ export default function ExercisesPage() {
   const urlEmotion = searchParams?.get('emotion') || null;
 
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [selectedEmotion, setSelectedEmotion] = useState<string>(urlEmotion || 'all');
+  const [selectedEmotion, setSelectedEmotion] = useState<string>(normalizeToExerciseEmotion(urlEmotion));
+  const [predictedEmotionLabel, setPredictedEmotionLabel] = useState<string>((urlEmotion || '').trim());
   const [completedExercises, setCompletedExercises] = useState<string[]>([]);
   const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
   const [apiExercises, setApiExercises] = useState<Exercise[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [usingFallback, setUsingFallback] = useState(false);
-  const [allExercises, setAllExercises] = useState<Exercise[]>(FALLBACK_EXERCISES);
+  const [allExercises, setAllExercises] = useState<Exercise[]>(getFallbackExercisesForEmotion(normalizeToExerciseEmotion(urlEmotion)));
   const [recommendationId, setRecommendationId] = useState<string>('');
   const [userPrefs, setUserPrefs] = useState<Partial<RecommendationSettings>>({});
 
@@ -136,13 +170,37 @@ export default function ExercisesPage() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    const fromUrl = (searchParams?.get('emotion') || '').trim();
+    if (fromUrl) {
+      setPredictedEmotionLabel(fromUrl);
+      setSelectedEmotion(normalizeToExerciseEmotion(fromUrl));
+      return;
+    }
+
+    if (typeof window === 'undefined') return;
+    const stored = localStorage.getItem('lastRecommendations');
+    if (!stored) return;
+
+    try {
+      const parsed = JSON.parse(stored);
+      const detected = (parsed?.emotion || '').trim();
+      if (detected) {
+        setPredictedEmotionLabel(detected);
+        setSelectedEmotion(normalizeToExerciseEmotion(detected));
+      }
+    } catch {
+      // Ignore malformed cache.
+    }
+  }, [searchParams]);
+
   const categories = ['All', 'Yoga', 'Cardio', 'Strength', 'Meditation'];
 
   const fetchPersonalizedExercises = useCallback(async (emotion: string) => {
     const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
     if (!accessToken) {
       setUsingFallback(true);
-      setAllExercises(FALLBACK_EXERCISES);
+      setAllExercises(getFallbackExercisesForEmotion(emotion));
       return;
     }
 
@@ -151,7 +209,7 @@ export default function ExercisesPage() {
 
     try {
       const data = await apiGetPersonalizedRecommendations(accessToken, {
-        emotion: emotion === 'all' ? 'neutral' : emotion,
+        emotion,
         types: ['exercise'],
         preferences: {
           fitness_level: userPrefs.fitness_level,
@@ -161,19 +219,19 @@ export default function ExercisesPage() {
 
       const exerciseData = data.recommendations?.exercise;
       if (exerciseData && Array.isArray(exerciseData) && exerciseData.length > 0) {
-        const exercises = exerciseData.map((ex, idx) => apiExerciseToExercise(ex, idx));
+        const exercises = exerciseData.map((ex, idx) => ({ ...apiExerciseToExercise(ex, idx), emotion }));
         setApiExercises(exercises);
         setRecommendationId(data.recommendation_id || '');
-        // Merge: API exercises first, then fallback
-        setAllExercises([...exercises, ...FALLBACK_EXERCISES]);
+        // Merge: API exercises first, then emotion-matched fallback exercises.
+        setAllExercises([...exercises, ...getFallbackExercisesForEmotion(emotion)]);
       } else {
         setUsingFallback(true);
-        setAllExercises(FALLBACK_EXERCISES);
+        setAllExercises(getFallbackExercisesForEmotion(emotion));
       }
     } catch (err) {
       console.error('Failed to fetch personalized exercises:', err);
       setUsingFallback(true);
-      setAllExercises(FALLBACK_EXERCISES);
+      setAllExercises(getFallbackExercisesForEmotion(emotion));
     } finally {
       setIsLoading(false);
     }
@@ -248,43 +306,23 @@ export default function ExercisesPage() {
             for AI picks.
           </div>
         )}
-        {urlEmotion && !usingFallback && !isLoading && (
+        {predictedEmotionLabel && !usingFallback && !isLoading && (
           <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-indigo-200/80 bg-indigo-50/90 px-3 py-2 text-xs text-indigo-900 sm:text-sm">
             <span>✨</span>
             <span>
-              Tailored for <strong className="capitalize">{urlEmotion}</strong> from your check-in.
+              Tailored for <strong className="capitalize">{predictedEmotionLabel}</strong> from your check-in.
             </span>
-            <a href="/exercises" className="ml-auto shrink-0 text-[11px] font-medium text-indigo-600 hover:underline">
-              Clear
-            </a>
           </div>
         )}
 
         {/* Filters — scroll on narrow screens */}
         <div className="mb-4 flex flex-wrap items-center gap-1.5 sm:gap-2">
-          {urlEmotion ? (
-            <>
-              <span className="text-[11px] font-medium text-neutral-500 sm:text-xs">Mood:</span>
-              <span className="inline-flex items-center gap-1 rounded-full border border-neutral-900 bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white shadow-sm">
-                <span>{EMOTION_OPTIONS.find(e => e.key === selectedEmotion)?.emoji}</span>
-                {EMOTION_OPTIONS.find(e => e.key === selectedEmotion)?.label}
-              </span>
-              <span className="hidden text-[11px] text-neutral-400 sm:inline sm:text-xs">from check-in</span>
-            </>
-          ) : (
-            <>
-              <span className="basis-full text-[11px] font-medium text-neutral-500 sm:basis-auto sm:text-xs">Mood</span>
-              {EMOTION_OPTIONS.map((emo) => (
-                <button key={emo.key} onClick={() => setSelectedEmotion(emo.key)}
-                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-medium transition-all sm:px-3 sm:py-1.5 sm:text-sm ${
-                    selectedEmotion === emo.key ? 'border-neutral-900 bg-neutral-900 text-white shadow-sm' : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300'
-                  }`}>
-                  <span>{emo.emoji}</span>
-                  {emo.label}
-                </button>
-              ))}
-            </>
-          )}
+          <span className="text-[11px] font-medium text-neutral-500 sm:text-xs">Mood:</span>
+          <span className="inline-flex items-center gap-1 rounded-full border border-neutral-900 bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white shadow-sm">
+            <span>{EMOTION_META[selectedEmotion]?.emoji || '😌'}</span>
+            {EMOTION_META[selectedEmotion]?.label || 'Calm'}
+          </span>
+          <span className="hidden text-[11px] text-neutral-400 sm:inline sm:text-xs">from check-in</span>
           <span className="hidden text-neutral-300 sm:inline" aria-hidden>
             |
           </span>

@@ -241,3 +241,5 @@ EMOTION_7CLASS_MICROSERVICE_URL = config('EMOTION_7CLASS_MICROSERVICE_URL', defa
 # Recommendation Microservice Settings
 RECOMMENDATION_MICROSERVICE_URL = config('RECOMMENDATION_MICROSERVICE_URL', default='http://localhost:5000/api')
 TEXT_EMOTION_MICROSERVICE_URL = config('TEXT_EMOTION_MICROSERVICE_URL', default='http://localhost:5001')
+# Audio / voice emotion (Wav2Vec2) microservice
+VOICE_EMOTION_MICROSERVICE_URL = config('VOICE_EMOTION_MICROSERVICE_URL', default='http://127.0.0.1:5003')

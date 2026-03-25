@@ -7,7 +7,8 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from .models import QuickMoodLog, EmotionDetection
+from .models import QuickMoodLog
+from .serializers import DaysQuerySerializer, QuickMoodLogCreateSerializer
 from datetime import timedelta
 
 logger = logging.getLogger(__name__)
@@ -22,12 +23,10 @@ def quick_mood_logs(request):
     POST /api/emotions/quick-moods/ - Create mood log
     """
     if request.method == 'GET':
-        # Get mood logs for the user
-        days = request.query_params.get('days', 30)
-        try:
-            days = int(days)
-        except ValueError:
-            days = 30
+        params_serializer = DaysQuerySerializer(data=request.query_params)
+        if not params_serializer.is_valid():
+            return Response(params_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        days = params_serializer.validated_data['days']
         
         start_date = timezone.now() - timedelta(days=days)
         mood_logs = QuickMoodLog.objects.filter(
@@ -46,35 +45,13 @@ def quick_mood_logs(request):
         return Response(data, status=status.HTTP_200_OK)
     
     elif request.method == 'POST':
-        # Create new mood log
-        mood = request.data.get('mood')
-        intensity = request.data.get('intensity', 5)
-        note = request.data.get('note', '')
-        
-        if not mood:
-            return Response(
-                {'error': 'Mood is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Validate mood choice
-        valid_moods = [choice[0] for choice in QuickMoodLog.MOOD_CHOICES]
-        if mood not in valid_moods:
-            return Response(
-                {'error': f'Invalid mood. Must be one of: {", ".join(valid_moods)}'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Validate intensity
-        try:
-            intensity = int(intensity)
-            if intensity < 1 or intensity > 10:
-                raise ValueError
-        except (ValueError, TypeError):
-            return Response(
-                {'error': 'Intensity must be an integer between 1 and 10'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        request_serializer = QuickMoodLogCreateSerializer(data=request.data)
+        if not request_serializer.is_valid():
+            return Response(request_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        mood = request_serializer.validated_data['mood']
+        intensity = request_serializer.validated_data['intensity']
+        note = request_serializer.validated_data.get('note', '')
         
         # Create mood log
         mood_log = QuickMoodLog.objects.create(
@@ -103,11 +80,10 @@ def mood_statistics(request):
     Get mood statistics for the user
     GET /api/emotions/mood-stats/ - Get stats
     """
-    days = request.query_params.get('days', 30)
-    try:
-        days = int(days)
-    except ValueError:
-        days = 30
+    params_serializer = DaysQuerySerializer(data=request.query_params)
+    if not params_serializer.is_valid():
+        return Response(params_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    days = params_serializer.validated_data['days']
     
     start_date = timezone.now() - timedelta(days=days)
     mood_logs = QuickMoodLog.objects.filter(
