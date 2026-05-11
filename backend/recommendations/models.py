@@ -16,7 +16,7 @@ class Recommendation(models.Model):
         ('creative', 'Creative Activity'),
         ('rest', 'Rest & Relaxation'),
         ('therapy', 'Professional Support'),
-        ('journaling', 'Journaling'),
+        ('self_expression', 'Journaling & Self-Expression'),
         ('other', 'Other'),
     ]
     
@@ -100,7 +100,7 @@ class UserRecommendation(models.Model):
         ordering = ['-priority', '-created_at']
     
     def __str__(self):
-        return f"{self.user.username} - {self.recommendation.title}"
+        return f"{self.user.username} - {self.recommendation.get_title()}"
 
 
 class AIChatMessage(models.Model):
@@ -285,3 +285,45 @@ class Notification(models.Model):
             self.is_read = True
             self.read_at = timezone.now()
             self.save()
+
+
+class NotificationScheduleState(models.Model):
+    """Dedupe keys for scheduled notification jobs (one row per user)."""
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='notification_schedule_state',
+    )
+    last_session_reminder_date = models.DateField(null=True, blank=True)
+    last_mood_insight_iso_week = models.CharField(max_length=16, blank=True, default='')
+    last_weekly_report_iso_week = models.CharField(max_length=16, blank=True, default='')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'notification_schedule_state'
+
+    def __str__(self):
+        return f'schedule-state:{self.user_id}'
+
+
+class PushSubscription(models.Model):
+    """Browser Web Push subscription for a user (may have multiple devices)."""
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='push_subscriptions',
+    )
+    endpoint = models.TextField()
+    p256dh = models.CharField(max_length=255)
+    auth = models.CharField(max_length=255)
+    user_agent = models.CharField(max_length=512, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'push_subscriptions'
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'endpoint'], name='uniq_user_push_endpoint'),
+        ]
+
+    def __str__(self):
+        return f'push:{self.user_id}:{self.endpoint[:48]}'

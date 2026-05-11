@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Bell, Check, Trash2, X, Filter, CheckCheck } from 'lucide-react';
+import { Bell, Check, Trash2, CheckCheck } from 'lucide-react';
 import ProtectedPage from '@/components/ProtectedPage';
+import PageHeading from '@/components/PageHeading';
 import { useAuth } from '@/contexts/auth-context';
 import {
   apiGetNotifications,
@@ -214,76 +215,86 @@ export default function NotificationsPage() {
     ? notifications.filter(n => !n.is_read)
     : notifications;
 
+  const subtitleShort =
+    unreadCount > 0
+      ? `${unreadCount} unread · ${notifications.length} total`
+      : notifications.length > 0
+        ? `All caught up · ${notifications.length} saved`
+        : 'Inbox is empty'
+
   return (
     <ProtectedPage>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold mb-1">Notifications</h1>
-            <p className="text-sm text-gray-600">
-              {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}` : 'All caught up!'}
-            </p>
+      <div className="space-y-0">
+        <PageHeading icon={Bell} title="Notifications" subtitle={subtitleShort} dense />
+
+        {/* Filters + bulk actions — single compact toolbar */}
+        <div className="-mx-4 sm:-mx-6 px-4 sm:px-6 py-2 border-b border-gray-100 bg-neutral-50/80 flex flex-wrap items-center justify-between gap-2">
+          <div
+            className="inline-flex rounded-lg border border-gray-200/90 bg-white p-0.5 shadow-sm"
+            role="group"
+            aria-label="Filter notifications"
+          >
+            <button
+              type="button"
+              onClick={() => setFilter('all')}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                filter === 'all' ? 'bg-neutral-900 text-white shadow-sm' : 'text-neutral-600 hover:bg-neutral-50'
+              }`}
+            >
+              All <span className="tabular-nums opacity-80">({notifications.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilter('unread')}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                filter === 'unread' ? 'bg-neutral-900 text-white shadow-sm' : 'text-neutral-600 hover:bg-neutral-50'
+              }`}
+            >
+              Unread <span className="tabular-nums opacity-80">({unreadCount})</span>
+            </button>
           </div>
-          
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center gap-1.5 shrink-0">
             {unreadCount > 0 && (
               <button
+                type="button"
                 onClick={handleMarkAllAsRead}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                title="Mark all as read"
+                aria-label="Mark all as read"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
               >
-                <CheckCheck className="w-4 h-4" />
-                Mark all read
+                <CheckCheck className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Mark read</span>
               </button>
             )}
             {notifications.length > 0 && (
               <button
+                type="button"
                 onClick={handleClearAll}
-                className="flex items-center gap-2 px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors text-sm font-medium"
+                title="Clear all notifications"
+                aria-label="Clear all notifications"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-red-200/80 bg-white text-xs font-medium text-red-600 hover:bg-red-50/80 transition-colors"
               >
-                <Trash2 className="w-4 h-4" />
-                Clear all
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Clear</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex items-center gap-2 border-b border-gray-200 pb-4">
-          <Filter className="w-4 h-4 text-gray-500" />
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === 'all'
-                ? 'bg-black text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            All ({notifications.length})
-          </button>
-          <button
-            onClick={() => setFilter('unread')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === 'unread'
-                ? 'bg-black text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Unread ({unreadCount})
-          </button>
-        </div>
+        <div className="pt-3 space-y-3">
 
         {/* Error Message */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
             {error}
           </div>
         )}
 
         {/* Loading State */}
         {isLoading && (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-8 h-8 border-4 border-gray-200 border-t-black rounded-full animate-spin"></div>
+          <div className="flex items-center justify-center py-8">
+            <div className="w-7 h-7 border-2 border-neutral-200 border-t-neutral-900 rounded-full animate-spin" />
           </div>
         )}
 
@@ -291,77 +302,79 @@ export default function NotificationsPage() {
         {!isLoading && (
           <>
             {filteredNotifications.length === 0 ? (
-              <div className="text-center py-16">
-                <Bell className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <div className="text-center py-10 px-2">
+                <Bell className="w-12 h-12 mx-auto text-neutral-200 mb-3" strokeWidth={1.25} />
+                <h3 className="text-base font-semibold text-neutral-900 mb-1">
                   {filter === 'unread' ? 'No unread notifications' : 'No notifications yet'}
                 </h3>
-                <p className="text-sm text-gray-600">
+                <p className="text-xs text-neutral-500 max-w-xs mx-auto leading-relaxed">
                   {filter === 'unread'
-                    ? "You're all caught up! Check back later for new notifications."
-                    : 'Notifications will appear here when you receive them.'}
+                    ? "You're all caught up."
+                    : 'New alerts will show up here.'}
                 </p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {filteredNotifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`p-4 border rounded-lg transition-all cursor-pointer hover:shadow-md ${
+                    className={`group rounded-xl border transition-colors cursor-pointer ${
                       notification.is_read
-                        ? 'bg-white border-gray-200'
-                        : 'bg-blue-50 border-blue-200'
+                        ? 'bg-white border-neutral-200/90 hover:border-neutral-300'
+                        : 'bg-sky-50/80 border-sky-200/90 hover:border-sky-300'
                     }`}
                     onClick={() => handleNotificationClick(notification)}
                   >
-                    <div className="flex items-start gap-4">
-                      {/* Icon */}
-                      <div className="text-3xl flex-shrink-0">
+                    <div className="flex gap-2.5 sm:gap-3 p-3 sm:p-3.5">
+                      <div
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/90 text-base shadow-sm ring-1 ring-black/5"
+                        aria-hidden
+                      >
                         {getNotificationIcon(notification.type)}
                       </div>
 
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-4 mb-1">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h3 className="font-semibold text-gray-900">{notification.title}</h3>
-                              {!notification.is_read && (
-                                <span className="px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full font-medium">
-                                  New
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm text-gray-600 mb-2">{notification.message}</p>
-                          </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                          <h3 className="text-sm font-semibold text-neutral-900 leading-snug">
+                            {notification.title}
+                          </h3>
+                          {!notification.is_read && (
+                            <span className="shrink-0 rounded-full bg-sky-600 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-white">
+                              New
+                            </span>
+                          )}
                         </div>
+                        <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-neutral-600">
+                          {notification.message}
+                        </p>
 
-                        {/* Meta */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4 text-xs text-gray-500">
-                            <span className="px-2 py-1 bg-gray-100 rounded">
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]">
+                            <span className="rounded-md bg-neutral-100/90 px-1.5 py-0.5 font-medium text-neutral-600">
                               {getNotificationTypeLabel(notification.type)}
                             </span>
-                            <span>{formatTime(notification.created_at)}</span>
+                            <span className="tabular-nums text-neutral-400">{formatTime(notification.created_at)}</span>
                           </div>
-
-                          {/* Actions */}
-                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex shrink-0 items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
                             {!notification.is_read && (
                               <button
+                                type="button"
                                 onClick={() => handleMarkAsRead(notification.id)}
-                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                className="rounded-md p-1.5 text-neutral-500 transition-colors hover:bg-white/90 hover:text-neutral-800"
                                 title="Mark as read"
+                                aria-label="Mark as read"
                               >
-                                <Check className="w-4 h-4 text-gray-600" />
+                                <Check className="h-3.5 w-3.5" />
                               </button>
                             )}
                             <button
+                              type="button"
                               onClick={() => handleDelete(notification.id)}
-                              className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                              className="rounded-md p-1.5 text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-600"
                               title="Delete"
+                              aria-label="Delete notification"
                             >
-                              <Trash2 className="w-4 h-4 text-gray-600 hover:text-red-600" />
+                              <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         </div>
@@ -373,6 +386,7 @@ export default function NotificationsPage() {
             )}
           </>
         )}
+        </div>
       </div>
     </ProtectedPage>
   );

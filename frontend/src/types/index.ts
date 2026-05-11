@@ -9,7 +9,7 @@ export interface User {
   dateOfBirth?: string
   bio?: string
   mentalHealthConcerns: string[]
-  journalingGoals: string[]
+  moodTrackingGoals: string[]
   totalEntries: number
   currentStreak: number
   longestStreak: number
@@ -90,11 +90,11 @@ export interface UserPreferences {
   shareAnonymousData: boolean
 }
 
-// Journal Entry types
+// assistant Entry types
 export type EntryType = 'text' | 'voice' | 'video'
 export type PrivacySetting = 'private' | 'therapist'
 
-export interface JournalEntry {
+export interface CheckInEntry {
   id: string
   userId: string
   type: EntryType
@@ -184,7 +184,7 @@ export interface EmotionAnalytics {
   averageMood: number
 }
 
-export interface JournalingStats {
+export interface CheckInStats {
   totalEntries: number
   currentStreak: number
   longestStreak: number

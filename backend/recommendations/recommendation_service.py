@@ -36,6 +36,9 @@ class RecommendationStorageService:
         try:
             # Create or get Recommendation object
             recommendation_title = f"{emotion.capitalize()} Mood Support"
+            from users.encryption import get_encryption_service
+            encryption_service = get_encryption_service()
+            encrypted_title = encryption_service.encrypt(recommendation_title)
             
             # Build description from microservice data
             description_parts = []
@@ -57,20 +60,21 @@ class RecommendationStorageService:
                 description_parts.append(f"Meditation: {recommendations['meditation']}")
             
             description = " | ".join(description_parts) if description_parts else "Personalized recommendations"
+            encrypted_description = encryption_service.encrypt(description)
             
             # Create or update Recommendation
             recommendation, created = Recommendation.objects.get_or_create(
-                title=recommendation_title,
+                title_encrypted=encrypted_title,
                 category=emotion,
-                defaults={'description': description}
+                defaults={'description_encrypted': encrypted_description}
             )
             
             if created:
-                # Set encrypted fields
-                recommendation.set_title(recommendation_title)
-                recommendation.set_description(description)
                 recommendation.save()
                 logger.info(f"Created new Recommendation: {recommendation_title}")
+            elif recommendation.description_encrypted != encrypted_description:
+                recommendation.description_encrypted = encrypted_description
+                recommendation.save(update_fields=['description_encrypted', 'updated_at'])
             
             # Create UserRecommendation to assign it to the user
             user_recommendation, created = UserRecommendation.objects.get_or_create(

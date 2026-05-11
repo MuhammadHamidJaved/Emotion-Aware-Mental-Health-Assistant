@@ -39,11 +39,11 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { isCollapsed, setIsCollapsed } = useSidebar();
-  const { logout } = useAuth();
+  const { logout, user, isLoading } = useAuth();
 
-  // Don't show sidebar on landing, login, signup, onboarding pages
-  const publicPages = ['/', '/login', '/signup', '/onboarding'];
-  if (publicPages.includes(pathname)) {
+  // Don't show sidebar on landing, login, signup, onboarding pages or if unauthenticated
+  const publicPages = ['/', '/login', '/signup', '/onboarding', '/privacy', '/terms'];
+  if (publicPages.includes(pathname) || (!isLoading && !user)) {
     return null;
   }
 
@@ -133,7 +133,7 @@ export default function Sidebar() {
             className="flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-100"
           >
             <LogOut className="h-4 w-4" />
-            <span className="hidden lg:inline">Logout</span>
+            {!isCollapsed && <span>Logout</span>}
           </button>
         </div>
       </aside>

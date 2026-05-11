@@ -1,6 +1,6 @@
 # Backend - Django REST API
 
-Emotion-Aware Mental Health Journaling System - Backend API
+Emotion-Aware Mental Health Assistanting System - Backend API
 
 ## 📋 Setup Instructions
 
@@ -61,9 +61,9 @@ backend/
 │   ├── models.py        # Custom User model
 │   ├── views.py         # User API views
 │   └── serializers.py   # User serializers
-├── journal/             # Journal entries app
+├── Assistant/             # Assistant entries app
 │   ├── models.py        # Entry, Media, Tag models
-│   ├── views.py         # Journal API views
+│   ├── views.py         # Assistant API views
 │   └── serializers.py   # Entry serializers
 ├── emotions/            # Emotion detection app
 │   ├── models.py        # Emotion & Mood models
@@ -83,8 +83,8 @@ backend/
 ### Users App
 - **User**: Custom user model with profile and preferences
 
-### Journal App
-- **JournalEntry**: Main journal entry (text/voice/video)
+### Assistant App
+- **AssistantEntry**: Main Assistant entry (text/voice/video)
 - **EntryMedia**: Photo attachments for entries
 - **EntryTag**: User-defined tags
 - **EntryTagRelation**: Many-to-many relationship
@@ -106,12 +106,12 @@ backend/
 - `POST /api/auth/token/refresh/` - Refresh JWT token
 - `POST /api/auth/logout/` - Logout user
 
-### Journal Entries
-- `GET /api/journal/entries/` - List all entries
-- `POST /api/journal/entries/` - Create new entry
-- `GET /api/journal/entries/{id}/` - Get entry detail
-- `PUT /api/journal/entries/{id}/` - Update entry
-- `DELETE /api/journal/entries/{id}/` - Delete entry
+### Assistant Entries
+- `GET /api/Assistant/entries/` - List all entries
+- `POST /api/Assistant/entries/` - Create new entry
+- `GET /api/Assistant/entries/{id}/` - Get entry detail
+- `PUT /api/Assistant/entries/{id}/` - Update entry
+- `DELETE /api/Assistant/entries/{id}/` - Delete entry
 
 ### Emotions
 - `GET /api/emotions/detections/` - List emotion detections

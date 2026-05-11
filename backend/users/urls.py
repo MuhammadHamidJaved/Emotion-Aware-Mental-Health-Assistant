@@ -18,6 +18,8 @@ urlpatterns = [
     path("settings/notifications/", settings_views.settings_notifications, name="settings-notifications"),
     path("settings/privacy/", settings_views.settings_privacy, name="settings-privacy"),
     path("settings/appearance/", settings_views.settings_appearance, name="settings-appearance"),
+    path("settings/recommendations/", settings_views.settings_recommendations, name="settings-recommendations"),
+    path("settings/recommendations/options/", settings_views.meta_recommendation_options, name="settings-recommendations-options"),
     path("settings/export-data/", settings_views.settings_export_data, name="settings-export-data"),
     path("settings/delete-account/", settings_views.settings_delete_account, name="settings-delete-account"),
 ]

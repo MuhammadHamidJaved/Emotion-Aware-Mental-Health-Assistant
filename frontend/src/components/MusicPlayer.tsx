@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Volume2, Plus, MoreHorizontal, Music, ExternalLink } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, Music, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface Track {
@@ -21,9 +21,10 @@ interface MusicPlayerProps {
   onNext?: () => void;
   onPrevious?: () => void;
   onTrackSelect?: (track: Track) => void;
+  hideArtist?: boolean;
 }
 
-export default function MusicPlayer({ track, playlist = [], onNext, onPrevious, onTrackSelect }: MusicPlayerProps) {
+export default function MusicPlayer({ track, playlist = [], onNext, onPrevious, onTrackSelect, hideArtist = false }: MusicPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -32,6 +33,31 @@ export default function MusicPlayer({ track, playlist = [], onNext, onPrevious, 
   const [usePreview, setUsePreview] = useState(false); // Toggle between embed and preview
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  const normalizeSpotifyUrl = (url?: string): string | null => {
+    if (!url) return null;
+
+    if (url.includes('open.spotify.com/')) {
+      return url;
+    }
+
+    const uriMatch = url.match(/^spotify:(track|album|playlist):([A-Za-z0-9]+)$/);
+    if (uriMatch) {
+      return `https://open.spotify.com/${uriMatch[1]}/${uriMatch[2]}`;
+    }
+
+    const apiMatch = url.match(/api\.spotify\.com\/v1\/(tracks|albums|playlists)\/([A-Za-z0-9]+)/);
+    if (apiMatch) {
+      const typeMap: Record<string, string> = {
+        tracks: 'track',
+        albums: 'album',
+        playlists: 'playlist',
+      };
+      return `https://open.spotify.com/${typeMap[apiMatch[1]]}/${apiMatch[2]}`;
+    }
+
+    return null;
+  };
 
   // Convert Spotify URL to embed URL
   const getEmbedUrl = (url: string | undefined): string | null => {
@@ -51,7 +77,8 @@ export default function MusicPlayer({ track, playlist = [], onNext, onPrevious, 
     return null;
   };
 
-  const embedUrl = getEmbedUrl(track.url);
+  const normalizedTrackUrl = normalizeSpotifyUrl(track.url);
+  const embedUrl = getEmbedUrl(normalizedTrackUrl || undefined);
   const hasEmbed = !!embedUrl;
 
   // Initialize audio element
@@ -93,13 +120,13 @@ export default function MusicPlayer({ track, playlist = [], onNext, onPrevious, 
       setIsPlaying(false);
     }
     // Reset to embed mode when track changes (if embed is available)
-    const newEmbedUrl = getEmbedUrl(track.url);
+    const newEmbedUrl = getEmbedUrl(normalizedTrackUrl || undefined);
     if (newEmbedUrl) {
       setUsePreview(false);
     } else if (track.preview_url) {
       setUsePreview(true);
     }
-  }, [track.id, track.preview_url, track.url]);
+  }, [track.id, track.preview_url, normalizedTrackUrl]);
 
   const togglePlayPause = () => {
     // If using preview audio
@@ -119,9 +146,10 @@ export default function MusicPlayer({ track, playlist = [], onNext, onPrevious, 
       // Spotify embed handles playback automatically
       // We can't control it programmatically, but we can track state
       setIsPlaying(!isPlaying);
-    } else if (track.url) {
+    } else if (normalizedTrackUrl) {
       // Fallback: open in Spotify
-      window.open(track.url, '_blank');
+      window.open(normalizedTrackUrl, '_blank');
+      setIsPlaying(false);
     }
   };
 
@@ -189,7 +217,7 @@ export default function MusicPlayer({ track, playlist = [], onNext, onPrevious, 
         <div className="flex-1 min-w-0">
           <div className="mb-2">
             <h3 className="font-semibold text-lg truncate">{track.title}</h3>
-            <p className="text-sm text-gray-400 truncate">{track.artist}</p>
+            {!hideArtist && <p className="text-sm text-gray-400 truncate">{track.artist}</p>}
           </div>
           {/* Toggle between embed and preview if both available */}
           {hasEmbed && hasPreview && (
@@ -212,9 +240,9 @@ export default function MusicPlayer({ track, playlist = [], onNext, onPrevious, 
               </Button>
             </div>
           )}
-          {track.url && !hasEmbed && (
+          {normalizedTrackUrl && !hasEmbed && (
             <a 
-              href={track.url} 
+              href={normalizedTrackUrl} 
               target="_blank" 
               rel="noopener noreferrer"
               className="inline-block"
@@ -286,11 +314,11 @@ export default function MusicPlayer({ track, playlist = [], onNext, onPrevious, 
               )}
               <div className="flex-1 min-w-0">
                 <div className="text-sm truncate font-medium">{t.title}</div>
-                <div className="text-xs text-gray-500 truncate">{t.artist}</div>
+                {!hideArtist && <div className="text-xs text-gray-500 truncate">{t.artist}</div>}
               </div>
-              {t.url && (
+              {normalizeSpotifyUrl(t.url || undefined) && (
                 <a 
-                  href={t.url} 
+                  href={normalizeSpotifyUrl(t.url || undefined) || '#'} 
                   target="_blank" 
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
@@ -337,14 +365,14 @@ export default function MusicPlayer({ track, playlist = [], onNext, onPrevious, 
                 <SkipBack className="w-4 h-4" />
               </Button>
             )}
-            {usePreview && (
+            {(usePreview || !hasEmbed) && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={togglePlayPause}
                 className="text-white hover:bg-gray-800 p-2"
               >
-                {isPlaying ? (
+                {isPlaying && usePreview ? (
                   <Pause className="w-5 h-5" />
                 ) : (
                   <Play className="w-5 h-5" />

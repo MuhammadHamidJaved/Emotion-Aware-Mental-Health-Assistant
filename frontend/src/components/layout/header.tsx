@@ -1,7 +1,6 @@
 'use client'
 
-import { Bell, Search } from 'lucide-react'
-import { Input } from '@/components/ui/input'
+import Link from 'next/link'
 import { Avatar } from '@/components/ui/avatar'
 import { useAuth } from '@/contexts/auth-context'
 import NotificationDropdown from '@/components/NotificationDropdown'
@@ -14,33 +13,25 @@ export function Header() {
       : user?.email?.[0]?.toUpperCase() ?? 'U'
 
   return (
-    <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-gray-200 bg-white px-6">
-      {/* Search */}
-      <div className="flex flex-1 items-center space-x-4">
-        <div className="relative w-96 max-w-full">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <Input
-            type="search"
-            placeholder="Search entries, tags, insights..."
-            className="pl-10"
-          />
-        </div>
-      </div>
-      
-      {/* Right Side */}
-      <div className="flex items-center space-x-4">
-        {/* Notifications */}
+    <header className="sticky top-0 z-10 flex h-16 items-center justify-end border-b border-gray-200 bg-white pl-14 pr-4 md:px-6">
+      <div className="flex items-center gap-3 md:gap-4">
         <NotificationDropdown />
-        
-        {/* Profile */}
-        <button className="flex items-center space-x-2 rounded-lg p-1.5 hover:bg-gray-100">
-          <Avatar 
-            src={undefined}
+
+        <Link
+          href="/profile"
+          className="flex items-center gap-2 rounded-lg p-1.5 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
+          aria-label="View profile"
+        >
+          <Avatar
+            src={user?.profile_picture ?? undefined}
             alt={user?.email ?? 'User'}
             fallback={initials}
             size="sm"
           />
-        </button>
+          <span className="hidden min-w-0 sm:block text-left text-sm font-medium text-gray-900 truncate max-w-[10rem]">
+            {user?.first_name || user?.full_name || user?.email?.split('@')[0] || 'Profile'}
+          </span>
+        </Link>
       </div>
     </header>
   )

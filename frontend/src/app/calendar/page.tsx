@@ -13,6 +13,7 @@ import {
   type MonthSummary
 } from '@/lib/api';
 import ProtectedPage from '@/components/ProtectedPage';
+import PageHeading from '@/components/PageHeading';
 
 interface DayEntry extends CalendarDayEntry {}
 
@@ -155,14 +156,14 @@ export default function CalendarPage() {
   const isCurrentMonth = currentDate.getMonth() === today.getMonth() && 
                          currentDate.getFullYear() === today.getFullYear();
 
+  const calendarSubtitle = monthSummary
+    ? `Track your emotional journey over time • ${monthSummary.days_logged} day${monthSummary.days_logged !== 1 ? 's' : ''} with entries this month`
+    : 'Track your emotional journey over time • view moods by day'
+
   return (
     <ProtectedPage>
       <div className="space-y-4">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold mb-1">Mood Calendar</h1>
-          <p className="text-sm text-neutral-600">Track your emotional journey over time</p>
-        </div>
+        <PageHeading icon={CalendarIcon} title="Mood Calendar" subtitle={calendarSubtitle} />
 
         {/* Error Message */}
         {error && (
@@ -294,7 +295,7 @@ export default function CalendarPage() {
 
           {/* Selected Day Details */}
           <div>
-            <div className="border border-gray-200 rounded-lg p-6 sticky top-6">
+            <div className="border border-gray-200 rounded-lg p-6">
               {selectedDay ? (
                 <>
                   <div className="flex items-center gap-2 mb-4">

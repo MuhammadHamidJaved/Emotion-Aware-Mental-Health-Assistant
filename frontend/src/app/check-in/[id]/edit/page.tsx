@@ -106,17 +106,15 @@ export default function EditCheckInPage() {
 
   if (!entry) {
     return (
-      <div className="min-h-screen bg-white text-black p-6">
-        <div className="max-w-4xl mx-auto text-center py-20">
-          <h1 className="text-2xl font-bold mb-4">Check-In Not Found</h1>
-          <Link 
-            href="/check-in"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Check-In History
-          </Link>
-        </div>
+      <div className="text-center py-20">
+        <h1 className="text-2xl font-bold mb-4">Check-In Not Found</h1>
+        <Link
+          href="/check-in"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Check-In History
+        </Link>
       </div>
     );
   }
@@ -200,30 +198,29 @@ export default function EditCheckInPage() {
   const hasChanges = content !== entry.content || JSON.stringify(tags) !== JSON.stringify(entry.tags);
 
   return (
-    <div className="min-h-screen bg-white text-black p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <Link 
+        <div className="bg-white border-b border-gray-200 -mx-4 sm:-mx-6 px-4 sm:px-6 py-4 flex items-center justify-between">
+          <Link
             href={`/check-in/${entryId}`}
-            className="flex items-center gap-2 text-gray-600 hover:text-black transition-colors"
+            className="flex items-center gap-2 text-gray-500 hover:text-black transition-colors text-sm"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4" />
             <span className="text-sm">Back to Check-In</span>
           </Link>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
               onClick={handleReanalyze}
               disabled={content.trim().length < 10 || isReanalyzing}
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isReanalyzing ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <RefreshCcw className="w-4 h-4" />
+                <RefreshCcw className="w-3.5 h-3.5" />
               )}
-              <span className="text-sm font-medium">Re-analyze Emotions</span>
+              Re-analyze
             </button>
 
             <button
@@ -241,11 +238,11 @@ export default function EditCheckInPage() {
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8">
+        <div className="grid lg:grid-cols-3 gap-6">
           {/* Main Editor */}
           <div className="lg:col-span-2 space-y-6">
             {/* Content Editor */}
-            <div className="border border-gray-200 rounded-lg p-6">
+            <div className="bg-white rounded-2xl border border-gray-200 p-6">
               <label className="block text-sm font-medium text-gray-700 mb-3">
                 Edit your check-in
               </label>
@@ -267,7 +264,7 @@ export default function EditCheckInPage() {
             </div>
 
             {/* Tags */}
-            <div className="border border-gray-200 rounded-lg p-6">
+            <div className="bg-white rounded-2xl border border-gray-200 p-6">
               <label className="block text-sm font-medium text-gray-700 mb-3">
                 Tags
               </label>
@@ -309,7 +306,7 @@ export default function EditCheckInPage() {
           {/* Emotion Comparison Sidebar */}
           <div className="space-y-6">
             {/* Original Emotion */}
-            <div className="border border-gray-200 rounded-lg p-6">
+            <div className="bg-white rounded-2xl border border-gray-200 p-5">
               <h3 className="text-sm font-medium text-gray-600 mb-4">Original Analysis</h3>
               <div className="p-4 bg-gray-50 rounded-lg">
                 <div className="text-center mb-4">
@@ -336,7 +333,7 @@ export default function EditCheckInPage() {
 
             {/* New Emotion (after re-analysis) */}
             {newEmotion && (
-              <div className="border-2 border-black rounded-lg p-6">
+              <div className="border-2 border-black rounded-2xl p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-medium text-gray-900">New Analysis</h3>
                   <span className="px-2 py-1 bg-black text-white text-xs rounded">Updated</span>
@@ -375,7 +372,7 @@ export default function EditCheckInPage() {
 
             {/* Comparison Helper */}
             {newEmotion && newEmotion.dominant !== originalEmotion.dominant && (
-              <div className="border border-yellow-300 bg-yellow-50 rounded-lg p-4">
+              <div className="rounded-2xl border border-yellow-300 bg-yellow-50 p-4">
                 <div className="flex items-start gap-2">
                   <Zap className="w-4 h-4 text-yellow-600 mt-0.5" />
                   <div className="text-xs text-yellow-900">
@@ -389,13 +386,12 @@ export default function EditCheckInPage() {
             )}
 
             {/* Instructions */}
-            <div className="border border-gray-200 rounded-lg p-4 text-xs text-gray-600">
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 text-xs text-gray-500">
               <p className="mb-2">💡 <strong>Tip:</strong> Edit your check-in and click "Re-analyze" to see updated emotion predictions.</p>
               <p>Changes will be saved when you click "Save Changes".</p>
             </div>
           </div>
         </div>
-      </div>
     </div>
   );
 }

@@ -36,7 +36,7 @@ export default function Home() {
         <div className="max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full text-sm mb-6">
             <Sparkles className="w-4 h-4" />
-            <span className="font-medium">95% accuracy with advanced ML models</span>
+            <span className="font-medium">Multi-modal AI emotion detection</span>
           </div>
           
           <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight">
@@ -52,12 +52,9 @@ export default function Home() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-            <Link href="/signup" className="px-6 py-3 bg-black text-white font-medium rounded-lg hover:bg-gray-800 transition-colors flex items-center justify-center gap-2">
-              Start Free Trial
+            <Link href="/signup" className="px-8 py-3 bg-black text-white font-medium rounded-lg hover:bg-gray-800 transition-colors flex items-center justify-center gap-2">
+              Get Started
               <ArrowRight className="w-5 h-5" />
-            </Link>
-            <Link href="/check-in/new" className="px-6 py-3 bg-white border-2 border-gray-200 text-gray-800 font-medium rounded-lg hover:border-gray-400 transition-colors">
-              Try Live Demo
             </Link>
           </div>
           
@@ -83,8 +80,8 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             <div className="text-center">
-              <div className="text-4xl font-bold mb-2">95%</div>
-              <div className="text-gray-400 text-sm">ML Accuracy</div>
+              <div className="text-4xl font-bold mb-2">3</div>
+              <div className="text-gray-400 text-sm">ML Models</div>
             </div>
             <div className="text-center">
               <div className="text-4xl font-bold mb-2">16</div>
@@ -109,7 +106,7 @@ export default function Home() {
             Multi-modal <span className="bg-gradient-to-r from-gray-700 to-black bg-clip-text text-transparent">Detection</span>
           </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Advanced ML models analyze your emotions across different input types with industry-leading accuracy
+            Advanced ML models analyze your emotions across different input types with high accuracy
           </p>
         </div>
         
@@ -120,7 +117,7 @@ export default function Home() {
             </div>
             <h3 className="text-xl font-bold mb-2">Text Analysis</h3>
             <p className="text-gray-600 mb-4 text-sm">
-              Our NLP model achieves <span className="font-semibold text-black">94.7% accuracy</span> in detecting emotions from written journal entries using BERT-based classification.
+              Our NLP model achieves <span className="font-semibold text-black">94.7% accuracy</span> in detecting emotions from written entries using BERT-based classification.
             </p>
             <div className="text-xs text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg inline-block">
               BERT-based • 8 emotion classes
@@ -133,7 +130,7 @@ export default function Home() {
             </div>
             <h3 className="text-xl font-bold mb-2">Voice Sentiment</h3>
             <p className="text-gray-600 mb-4 text-sm">
-              Analyze tone, pitch, and speech patterns with <span className="font-semibold text-black">89.2% accuracy</span> using advanced audio CNN architecture.
+              Analyze tone, pitch, and speech patterns with <span className="font-semibold text-black">91.4% accuracy</span> using advanced audio CNN architecture.
             </p>
             <div className="text-xs text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg inline-block">
               Audio CNN • 6 emotion classes
@@ -146,7 +143,7 @@ export default function Home() {
             </div>
             <h3 className="text-xl font-bold mb-2">Facial Expression</h3>
             <p className="text-gray-600 mb-4 text-sm">
-              Real-time facial emotion recognition with <span className="font-semibold text-black">93.4% accuracy</span> using ResNet-50 computer vision.
+              Real-time facial emotion recognition with <span className="font-semibold text-black">78.2% accuracy</span> using ResNet-50 computer vision.
             </p>
             <div className="text-xs text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg inline-block">
               ResNet-50 • 7 emotion classes
@@ -196,21 +193,21 @@ export default function Home() {
                 
                 <div>
                   <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-700">Facial Expression Recognition</span>
-                    <span className="font-semibold">93.4%</span>
+                    <span className="text-gray-700">Voice Sentiment Analyzer</span>
+                    <span className="font-semibold">91.4%</span>
                   </div>
                   <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-gray-700 to-black rounded-full" style={{ width: '93.4%' }} />
+                    <div className="h-full bg-gradient-to-r from-gray-700 to-black rounded-full" style={{ width: '91.4%' }} />
                   </div>
                 </div>
-                
+
                 <div>
                   <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-700">Voice Sentiment Analyzer</span>
-                    <span className="font-semibold">89.2%</span>
+                    <span className="text-gray-700">Facial Expression Recognition</span>
+                    <span className="font-semibold">78.2%</span>
                   </div>
                   <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-gray-700 to-black rounded-full" style={{ width: '89.2%' }} />
+                    <div className="h-full bg-gradient-to-r from-gray-700 to-black rounded-full" style={{ width: '78.2%' }} />
                   </div>
                 </div>
               </div>
@@ -387,7 +384,7 @@ export default function Home() {
               Ready to understand your emotions?
             </h2>
             <p className="text-lg text-gray-400 mb-8 max-w-2xl mx-auto">
-              Join thousands of users transforming their mental wellness with AI-powered emotion detection.
+              Start your mental wellness journey with AI-powered emotion detection.
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -395,13 +392,10 @@ export default function Home() {
                 Get Started Free
                 <ArrowRight className="w-5 h-5" />
               </Link>
-              <Link href="/ml-models" className="px-8 py-3 bg-white/10 text-white border border-white/20 rounded-lg hover:bg-white/20 transition-colors font-medium">
-                Explore ML Models
-              </Link>
             </div>
             
             <p className="text-gray-500 text-sm mt-6">
-              No credit card required • Free forever • Cancel anytime
+              No credit card required • Free forever
             </p>
           </div>
         </div>
@@ -425,9 +419,8 @@ export default function Home() {
               <h4 className="font-bold mb-3">Product</h4>
               <ul className="space-y-2 text-sm text-gray-600">
                 <li><a href="#features" className="hover:text-black transition-colors">Features</a></li>
-                <li><a href="/ml-models" className="hover:text-black transition-colors">ML Models</a></li>
-                <li><a href="/check-in/new" className="hover:text-black transition-colors">Live Demo</a></li>
-                <li><a href="/dashboard" className="hover:text-black transition-colors">Dashboard</a></li>
+                <li><a href="#ml-models" className="hover:text-black transition-colors">ML Models</a></li>
+                <li><Link href="/dashboard" className="hover:text-black transition-colors">Dashboard</Link></li>
               </ul>
             </div>
             
@@ -437,15 +430,14 @@ export default function Home() {
                 <li><a href="#" className="hover:text-black transition-colors">Documentation</a></li>
                 <li><a href="#" className="hover:text-black transition-colors">API Reference</a></li>
                 <li><a href="#" className="hover:text-black transition-colors">Help Center</a></li>
-                <li><a href="#" className="hover:text-black transition-colors">Blog</a></li>
               </ul>
             </div>
             
             <div>
               <h4 className="font-bold mb-3">Legal</h4>
               <ul className="space-y-2 text-sm text-gray-600">
-                <li><a href="/privacy" className="hover:text-black transition-colors">Privacy Policy</a></li>
-                <li><a href="/terms" className="hover:text-black transition-colors">Terms of Service</a></li>
+                <li><Link href="/privacy" className="hover:text-black transition-colors">Privacy Policy</Link></li>
+                <li><Link href="/terms" className="hover:text-black transition-colors">Terms of Service</Link></li>
                 <li><a href="#" className="hover:text-black transition-colors">Contact Us</a></li>
               </ul>
             </div>

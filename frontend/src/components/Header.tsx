@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Bell, Search, User } from 'lucide-react';
+import { User } from 'lucide-react';
 import { useSidebar } from '@/contexts/sidebar-context';
 import { useAuth } from '@/contexts/auth-context';
 import NotificationDropdown from '@/components/NotificationDropdown';
@@ -11,40 +11,13 @@ import Image from 'next/image';
 export default function Header() {
   const pathname = usePathname();
   const { isCollapsed } = useSidebar();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
 
-  // Don't show header on landing, login, signup, onboarding pages
-  const publicPages = ['/', '/login', '/signup', '/onboarding'];
-  if (publicPages.includes(pathname)) {
+  // Don't show header on landing, login, signup, onboarding pages or if unauthenticated
+  const publicPages = ['/', '/login', '/signup', '/onboarding', '/privacy', '/terms'];
+  if (publicPages.includes(pathname) || (!isLoading && !user)) {
     return null;
   }
-
-  // Get page title based on pathname
-  const getPageTitle = () => {
-    // Don't show title for dashboard - it has its own greeting
-    if (pathname === '/dashboard') return '';
-    
-    const titles: Record<string, string> = {
-      '/check-in': 'Check-In History',
-      '/insights': 'Analytics & Insights',
-      '/chat': 'AI Wellness Companion',
-      '/recommendations': 'Emotional Support',
-      '/music': 'Music Therapy',
-      '/exercises': 'Wellness Exercises',
-      '/quotes': 'Daily Motivation',
-      '/calendar': 'Mood Calendar',
-      '/notifications': 'Notifications',
-      '/ml-models': 'ML Models',
-      '/settings': 'Settings',
-    };
-
-    // Check for nested routes
-    if (pathname.startsWith('/check-in/new')) return 'Express Yourself';
-    if (pathname.startsWith('/check-in/') && pathname.includes('/edit')) return 'Edit Check-In';
-    if (pathname.startsWith('/check-in/')) return 'Check-In Details';
-
-    return titles[pathname] || 'EmotionAI';
-  };
 
   return (
     <header 
@@ -52,14 +25,9 @@ export default function Header() {
         isCollapsed ? 'lg:left-20' : 'lg:left-64'
       }`}
     >
-      <div className="h-full px-6 flex items-center justify-end">
+      <div className="h-full pl-16 pr-4 lg:px-6 flex items-center justify-end">
         {/* Right Side Actions */}
         <div className="flex items-center gap-4">
-          {/* Search */}
-          <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <Search className="w-5 h-5 text-gray-600" />
-          </button>
-
           {/* Notifications */}
           <NotificationDropdown />
 

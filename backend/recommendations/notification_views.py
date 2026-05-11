@@ -5,8 +5,10 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from .models import Notification
+from .models import Notification, PushSubscription
+from .notification_dispatcher import NotificationDispatcher
 from .notification_service import NotificationService
+from . import push_service
 from .serializers import NotificationSerializer
 import logging
 
@@ -140,20 +142,53 @@ def test_notification(request):
     Create a test notification (for development/testing)
     """
     notification_type = request.data.get('type', 'session_reminder')
-    
+    force = bool(request.data.get('force'))
+
     if notification_type == 'session_reminder':
-        notification = NotificationService.create_session_reminder(request.user)
-    elif notification_type == 'mood_insight':
-        notification = NotificationService.create_mood_insight(
+        notification = NotificationDispatcher.dispatch(
             request.user,
-            'You seem to be experiencing more positive emotions this week!'
+            'session_reminder',
+            'Time for your emotional check-in',
+            'Take a moment to reflect on how you\'re feeling today.',
+            '/check-in/new',
+            skip_type_check=force,
+        )
+    elif notification_type == 'mood_insight':
+        notification = NotificationDispatcher.dispatch(
+            request.user,
+            'mood_insight',
+            'New mood insight available',
+            'You seem to be experiencing more positive emotions this week!',
+            '/insights',
+            skip_type_check=force,
+        )
+    elif notification_type == 'weekly_report':
+        notification = NotificationDispatcher.dispatch(
+            request.user,
+            'weekly_report',
+            'Your weekly emotional wellness report',
+            'Check out your progress and insights from this week.',
+            "/insights",
+            skip_type_check=force,
         )
     elif notification_type == 'streak_alert':
-        notification = NotificationService.create_streak_alert(request.user, 7)
-    elif notification_type == 'ai_suggestion':
-        notification = NotificationService.create_ai_suggestion(
+        notification = NotificationDispatcher.dispatch(
             request.user,
-            'Try a 5-minute breathing exercise to help manage stress.'
+            'streak_alert',
+            '🔥 7 day streak!',
+            'Amazing! You\'ve logged your emotions for 7 days in a row. Keep it up!',
+            '/dashboard',
+            metadata={'streak_count': 7},
+            skip_type_check=force,
+        )
+    elif notification_type == 'ai_suggestion':
+        notification = NotificationDispatcher.dispatch(
+            request.user,
+            'ai_suggestion',
+            'Your AI companion has a suggestion',
+            'Try a 5-minute breathing exercise to help manage stress.',
+            '/chat',
+            skip_type_check=force,
         )
     else:
         return Response({
@@ -170,4 +205,49 @@ def test_notification(request):
         return Response({
             'error': 'Failed to create notification'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def push_vapid_public_key(request):
+    """Public VAPID key for Web Push subscription (safe to expose)."""
+    key = push_service.get_public_vapid_key()
+    return Response({
+        'enabled': bool(key),
+        'publicKey': key or None,
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def push_subscribe(request):
+    """
+    Register a browser push subscription.
+    Body: {"endpoint": "...", "keys": {"p256dh": "...", "auth": "..."}}
+    """
+    endpoint = request.data.get('endpoint')
+    keys = request.data.get('keys') or {}
+    p256dh = keys.get('p256dh')
+    auth = keys.get('auth')
+    if not endpoint or not p256dh or not auth:
+        return Response({'error': 'endpoint and keys.p256dh, keys.auth required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    ua = (request.META.get('HTTP_USER_AGENT') or '')[:512]
+    PushSubscription.objects.update_or_create(
+        user=request.user,
+        endpoint=endpoint,
+        defaults={'p256dh': p256dh, 'auth': auth, 'user_agent': ua},
+    )
+    return Response({'ok': True}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def push_unsubscribe(request):
+    """Remove a subscription (e.g. user disabled push or token expired)."""
+    endpoint = request.data.get('endpoint')
+    if not endpoint:
+        return Response({'error': 'endpoint required'}, status=status.HTTP_400_BAD_REQUEST)
+    PushSubscription.objects.filter(user=request.user, endpoint=endpoint).delete()
+    return Response({'ok': True}, status=status.HTTP_200_OK)
 

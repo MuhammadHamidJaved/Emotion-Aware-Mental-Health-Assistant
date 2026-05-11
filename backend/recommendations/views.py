@@ -9,6 +9,7 @@ from django.utils import timezone
 from .models import AIChatMessage
 from .serializers import ChatMessageSerializer, ChatMessageCreateSerializer, ChatResponseSerializer
 from .rag_service import get_bot_instance
+from .notification_dispatcher import NotificationDispatcher
 from .notification_service import NotificationService
 import traceback
 import logging
@@ -90,10 +91,16 @@ def send_message(request):
         # Create notification after AI response
         try:
             if NotificationService.should_send_notification(request.user, 'ai_suggestion'):
-                NotificationService.create_ai_suggestion(
+                ans = bot_response.get('answer', '') or ''
+                snippet = ans[:280]
+                suffix = '…' if len(ans) > 280 else ''
+                NotificationDispatcher.dispatch(
                     user=request.user,
-                    suggestion_text=f"AI Companion: {bot_response.get('answer', '')[:100]}...",
-                    context={'chat_message_id': ai_chat_message.id}
+                    notification_type='ai_suggestion',
+                    title='Your AI companion has a suggestion',
+                    message=f'AI Companion: {snippet}{suffix}',
+                    action_url='/chat',
+                    metadata={'chat_message_id': ai_chat_message.id},
                 )
                 print("✅ Notification created for AI response")
         except Exception as e:

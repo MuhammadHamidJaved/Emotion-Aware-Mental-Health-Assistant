@@ -1,20 +1,27 @@
 """
 Settings API endpoints with AES-256 encryption
 """
+import json
+import logging
+import re
+
+import requests
+from django.http import HttpResponse
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework import status
-from django.db import transaction
-import logging
+from django.conf import settings as django_settings
+from common.external_service_utils import log_external_failure, map_external_exception
+from .services.settings_service import SettingsService
+from .services.response_helpers import api_response, error_response, first_error_message, ok_response
+from .serializers import (
+    AppearanceSettingsPatchSerializer,
+    NotificationSettingsPatchSerializer,
+    PrivacySettingsPatchSerializer,
+    ProfileSettingsPatchSerializer,
+    RecommendationSettingsPatchSerializer,
+)
 
 logger = logging.getLogger(__name__)
-
-try:
-    from .models import User
-    from .settings_models import UserPreferences
-except ImportError as e:
-    logger.error(f"Import error: {e}")
 
 
 @api_view(['GET', 'PATCH'])
@@ -25,128 +32,21 @@ def settings_profile(request):
     GET /api/settings/profile/
     PATCH /api/settings/profile/
     """
-    user = request.user
-    
     if request.method == 'GET':
-        # Update user stats if they're not set (for existing users)
-        if user.total_entries == 0:
-            try:
-                user.update_stats()
-            except Exception as e:
-                logger.warning(f"Could not update user stats: {e}")
-        
-        # Return decrypted profile data
-        bio = ""
-        phone_number = ""
-        
-        # Try encrypted fields first, fallback to plain text
-        try:
-            from .encryption import get_encryption_service
-            encryption_service = get_encryption_service()
-            
-            if user.bio_encrypted:
-                bio = encryption_service.decrypt(user.bio_encrypted)
-            elif user.bio:
-                bio = user.bio
-            
-            if user.phone_number_encrypted:
-                phone_number = encryption_service.decrypt(user.phone_number_encrypted)
-            elif user.phone_number:
-                phone_number = user.phone_number
-        except (ImportError, Exception) as e:
-            logger.warning(f"Encryption not available, using plain text: {e}")
-            bio = user.bio or ""
-            phone_number = user.phone_number or ""
-        
-        return Response({
-            'first_name': user.first_name or '',
-            'last_name': user.last_name or '',
-            'email': user.email,
-            'bio': bio,
-            'phone_number': phone_number,
-            'profile_picture': user.profile_picture or None,
-            'total_entries': user.total_entries,
-            'current_streak': user.current_streak,
-            'longest_streak': user.longest_streak,
-        }, status=status.HTTP_200_OK)
+        payload = SettingsService.get_profile_settings(request.user)
+        return ok_response(payload)
     
     elif request.method == 'PATCH':
-        # Update profile with encryption
-        try:
-            from .encryption import get_encryption_service
-            encryption_service = get_encryption_service()
-        except ImportError as e:
-            logger.error(f"Encryption service not available: {e}")
-            return Response(
-                {'error': 'Encryption service not available. Please install cryptography package.'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-        
-        try:
-            data = request.data.copy()
-            
-            # Handle profile picture upload (if provided)
-            if 'profile_picture' in request.FILES:
-                import cloudinary.uploader
-                profile_file = request.FILES['profile_picture']
-                try:
-                    upload_result = cloudinary.uploader.upload(
-                        profile_file,
-                        folder="emotion-journal/profile_pictures",
-                        resource_type="image",
-                    )
-                    data['profile_picture'] = upload_result.get("secure_url")
-                except Exception as e:
-                    return Response(
-                        {"error": f"Failed to upload profile picture: {e}"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-            
-            # Update basic fields
-            if 'first_name' in data:
-                user.first_name = data['first_name']
-            if 'last_name' in data:
-                user.last_name = data['last_name']
-            if 'profile_picture' in data:
-                user.profile_picture = data['profile_picture']
-            
-            # Encrypt and store sensitive fields
-            if 'bio' in data:
-                bio_text = data['bio']
-                if bio_text:
-                    user.bio_encrypted = encryption_service.encrypt(bio_text)
-                else:
-                    user.bio_encrypted = ""
-                # Keep plain text for backward compatibility (will be removed)
-                user.bio = bio_text
-            
-            if 'phone_number' in data:
-                phone_text = data['phone_number']
-                if phone_text:
-                    user.phone_number_encrypted = encryption_service.encrypt(phone_text)
-                else:
-                    user.phone_number_encrypted = ""
-                # Keep plain text for backward compatibility
-                user.phone_number = phone_text
-            
-            user.save()
-            
-            return Response({
-                'message': 'Profile updated successfully',
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-                'email': user.email,
-                'bio': encryption_service.decrypt(user.bio_encrypted) if user.bio_encrypted else "",
-                'phone_number': encryption_service.decrypt(user.phone_number_encrypted) if user.phone_number_encrypted else "",
-                'profile_picture': user.profile_picture,
-            }, status=status.HTTP_200_OK)
-        
-        except Exception as e:
-            logger.error(f"Error updating profile: {e}")
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        request_serializer = ProfileSettingsPatchSerializer(data=request.data, partial=True)
+        if not request_serializer.is_valid():
+            return error_response(first_error_message(request_serializer.errors), 400)
+
+        payload, status_code = SettingsService.update_profile_settings(
+            request.user,
+            request_serializer.validated_data,
+            request.FILES,
+        )
+        return api_response(payload, status_code)
 
 
 @api_view(['GET', 'PATCH'])
@@ -157,42 +57,20 @@ def settings_notifications(request):
     GET /api/settings/notifications/
     PATCH /api/settings/notifications/
     """
-    user = request.user
-    
-    # Get or create preferences
-    preferences, created = UserPreferences.objects.get_or_create(user=user)
-    
     if request.method == 'GET':
-        settings = preferences.get_notification_settings()
-        # Return default settings if empty
-        default_settings = {
-            'session_reminders': True,  # Changed from checkin_reminders
-            'mood_insights': True,
-            'weekly_reports': False,
-            'streak_alerts': True,
-            'ai_suggestions': True,
-            'email_notifications': True,
-            'push_notifications': False,
-        }
-        return Response({**default_settings, **settings}, status=status.HTTP_200_OK)
+        payload = SettingsService.get_notification_settings(request.user)
+        return ok_response(payload)
     
     elif request.method == 'PATCH':
-        try:
-            new_settings = request.data.copy()
-            preferences.set_notification_settings(new_settings)
-            preferences.save()
-            
-            return Response({
-                'message': 'Notification settings updated successfully',
-                'settings': new_settings
-            }, status=status.HTTP_200_OK)
-        
-        except Exception as e:
-            logger.error(f"Error updating notification settings: {e}")
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        request_serializer = NotificationSettingsPatchSerializer(data=request.data, partial=True)
+        if not request_serializer.is_valid():
+            return error_response(first_error_message(request_serializer.errors), 400)
+
+        payload, status_code = SettingsService.update_notification_settings(
+            request.user,
+            request_serializer.validated_data,
+        )
+        return api_response(payload, status_code)
 
 
 @api_view(['GET', 'PATCH'])
@@ -203,37 +81,20 @@ def settings_privacy(request):
     GET /api/settings/privacy/
     PATCH /api/settings/privacy/
     """
-    user = request.user
-    
-    preferences, created = UserPreferences.objects.get_or_create(user=user)
-    
     if request.method == 'GET':
-        settings = preferences.get_privacy_settings()
-        default_settings = {
-            'data_collection': True,
-            'share_analytics': False,
-            'cloud_backup': True,
-            'storage_type': 'hybrid',
-        }
-        return Response({**default_settings, **settings}, status=status.HTTP_200_OK)
+        payload = SettingsService.get_privacy_settings(request.user)
+        return ok_response(payload)
     
     elif request.method == 'PATCH':
-        try:
-            new_settings = request.data.copy()
-            preferences.set_privacy_settings(new_settings)
-            preferences.save()
-            
-            return Response({
-                'message': 'Privacy settings updated successfully',
-                'settings': new_settings
-            }, status=status.HTTP_200_OK)
-        
-        except Exception as e:
-            logger.error(f"Error updating privacy settings: {e}")
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        request_serializer = PrivacySettingsPatchSerializer(data=request.data, partial=True)
+        if not request_serializer.is_valid():
+            return error_response(first_error_message(request_serializer.errors), 400)
+
+        payload, status_code = SettingsService.update_privacy_settings(
+            request.user,
+            request_serializer.validated_data,
+        )
+        return api_response(payload, status_code)
 
 
 @api_view(['GET', 'PATCH'])
@@ -244,63 +105,188 @@ def settings_appearance(request):
     GET /api/settings/appearance/
     PATCH /api/settings/appearance/
     """
-    user = request.user
-    
-    preferences, created = UserPreferences.objects.get_or_create(user=user)
-    
     if request.method == 'GET':
-        settings = preferences.get_appearance_settings()
-        default_settings = {
-            'mood_adaptive': True,
-            'dark_mode': False,
-            'color_scheme': 'default',
-        }
-        return Response({**default_settings, **settings}, status=status.HTTP_200_OK)
+        payload = SettingsService.get_appearance_settings(request.user)
+        return ok_response(payload)
     
     elif request.method == 'PATCH':
-        try:
-            new_settings = request.data.copy()
-            preferences.set_appearance_settings(new_settings)
-            preferences.save()
-            
-            return Response({
-                'message': 'Appearance settings updated successfully',
-                'settings': new_settings
-            }, status=status.HTTP_200_OK)
-        
-        except Exception as e:
-            logger.error(f"Error updating appearance settings: {e}")
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        request_serializer = AppearanceSettingsPatchSerializer(data=request.data, partial=True)
+        if not request_serializer.is_valid():
+            return error_response(first_error_message(request_serializer.errors), 400)
+
+        payload, status_code = SettingsService.update_appearance_settings(
+            request.user,
+            request_serializer.validated_data,
+        )
+        return api_response(payload, status_code)
 
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def settings_export_data(request):
     """
-    Export user data
+    Export user data as a downloadable JSON file.
     POST /api/settings/export-data/
     """
-    # TODO: Implement data export functionality
-    return Response({
-        'message': 'Data export requested. You will receive an email with your data shortly.'
-    }, status=status.HTTP_200_OK)
+    from users.services.data_export_service import build_user_data_export
+
+    payload = build_user_data_export(request.user)
+    body = json.dumps(payload, indent=2, default=str)
+    safe_slug = re.sub(r'[^a-zA-Z0-9_-]+', '_', request.user.email.split('@')[0])[:80] or 'user'
+    filename = f'emotionai_export_{safe_slug}.json'
+
+    response = HttpResponse(body, content_type='application/json; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
 
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def settings_delete_account(request):
     """
-    Delete user account
+    Permanently delete the user account and related data (CASCADE).
     POST /api/settings/delete-account/
     """
     user = request.user
+    user_id = user.pk
+    user.delete()
+    logger.info('User account deleted id=%s', user_id)
+    return ok_response({
+        'message': 'Your account and associated data have been permanently deleted.',
+        'deleted': True,
+    })
+
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def settings_recommendations(request):
+    """
+    Get or update recommendation personalization settings.
+    These preferences are sent to the recommendation microservice
+    to personalize music, exercises, quotes, and meditation suggestions.
     
-    # TODO: Implement proper account deletion with confirmation
-    # For now, just mark as deleted or soft delete
-    return Response({
-        'message': 'Account deletion requested. You will receive a confirmation email.'
-    }, status=status.HTTP_200_OK)
+    GET /api/settings/recommendations/
+    PATCH /api/settings/recommendations/
+    """
+    if request.method == 'GET':
+        payload = SettingsService.get_recommendation_settings(request.user)
+        return ok_response(payload)
+    
+    elif request.method == 'PATCH':
+        request_serializer = RecommendationSettingsPatchSerializer(data=request.data, partial=True)
+        if not request_serializer.is_valid():
+            return error_response(first_error_message(request_serializer.errors), 400)
+
+        payload, status_code = SettingsService.update_recommendation_settings(
+            request.user,
+            request_serializer.validated_data,
+        )
+        return api_response(payload, status_code)
+
+
+RECOMMENDATION_MICROSERVICE_URL = getattr(
+    django_settings, 'RECOMMENDATION_MICROSERVICE_URL', 'http://localhost:5000/api'
+)
+
+MUSIC_LANGUAGES = [
+    {'value': '', 'label': 'Any Language'},
+    {'value': 'english', 'label': 'English'},
+    {'value': 'hindi', 'label': 'Hindi'},
+    {'value': 'urdu', 'label': 'Urdu'},
+    {'value': 'punjabi', 'label': 'Punjabi'},
+    {'value': 'arabic', 'label': 'Arabic'},
+    {'value': 'turkish', 'label': 'Turkish'},
+    {'value': 'korean', 'label': 'Korean'},
+    {'value': 'japanese', 'label': 'Japanese'},
+    {'value': 'spanish', 'label': 'Spanish'},
+    {'value': 'french', 'label': 'French'},
+    {'value': 'german', 'label': 'German'},
+    {'value': 'portuguese', 'label': 'Portuguese'},
+    {'value': 'bengali', 'label': 'Bengali'},
+    {'value': 'tamil', 'label': 'Tamil'},
+    {'value': 'telugu', 'label': 'Telugu'},
+    {'value': 'chinese', 'label': 'Chinese'},
+    {'value': 'italian', 'label': 'Italian'},
+    {'value': 'russian', 'label': 'Russian'},
+    {'value': 'thai', 'label': 'Thai'},
+    {'value': 'vietnamese', 'label': 'Vietnamese'},
+    {'value': 'malay', 'label': 'Malay'},
+    {'value': 'indonesian', 'label': 'Indonesian'},
+]
+
+MARKETS = [
+    {'code': 'US', 'name': 'United States'},
+    {'code': 'GB', 'name': 'United Kingdom'},
+    {'code': 'PK', 'name': 'Pakistan'},
+    {'code': 'IN', 'name': 'India'},
+    {'code': 'AE', 'name': 'United Arab Emirates'},
+    {'code': 'SA', 'name': 'Saudi Arabia'},
+    {'code': 'DE', 'name': 'Germany'},
+    {'code': 'FR', 'name': 'France'},
+    {'code': 'JP', 'name': 'Japan'},
+    {'code': 'KR', 'name': 'South Korea'},
+    {'code': 'AU', 'name': 'Australia'},
+    {'code': 'CA', 'name': 'Canada'},
+    {'code': 'TR', 'name': 'Turkey'},
+    {'code': 'BR', 'name': 'Brazil'},
+]
+
+FITNESS_LEVELS = ['beginner', 'moderate', 'advanced']
+
+AGE_GROUPS = [
+    {'value': 'teen', 'label': 'Teen (13-17)'},
+    {'value': 'young_adult', 'label': 'Young Adult (18-25)'},
+    {'value': 'adult', 'label': 'Adult (26-59)'},
+    {'value': 'senior', 'label': 'Senior (60+)'},
+]
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def meta_recommendation_options(request):
+    """
+    Return valid options for recommendation personalization fields.
+    Tries to fetch genres from the microservice; falls back to a hardcoded list.
+    
+    GET /api/settings/recommendations/options/
+    """
+    genres = [
+        'acoustic', 'afrobeat', 'alt-rock', 'alternative', 'ambient',
+        'blues', 'classical', 'chill', 'club', 'country',
+        'dance', 'deep-house', 'disco', 'drum-and-bass', 'edm',
+        'electronic', 'folk', 'funk', 'gospel', 'grunge',
+        'hip-hop', 'house', 'indie', 'indie-pop', 'jazz',
+        'k-pop', 'latin', 'lo-fi', 'metal', 'new-age',
+        'opera', 'piano', 'pop', 'punk', 'r-n-b',
+        'reggae', 'rock', 'romance', 'soul', 'study',
+        'techno', 'trance', 'world-music',
+    ]
+
+    try:
+        res = requests.get(f"{RECOMMENDATION_MICROSERVICE_URL}/meta/genres", timeout=5)
+        if res.ok:
+            data = res.json()
+            if isinstance(data, list):
+                genres = data
+            elif isinstance(data, dict) and 'genres' in data:
+                genres = data['genres']
+    except Exception as e:
+        error_info = map_external_exception(
+            e,
+            service_name='recommendation-microservice',
+            operation='meta-genres',
+            timeout_message='Recommendation metadata service timed out; using defaults.',
+            connection_message='Recommendation metadata service unavailable; using defaults.',
+            request_message='Recommendation metadata request failed; using defaults.',
+            unexpected_message='Recommendation metadata fetch failed; using defaults.',
+        )
+        log_external_failure(logger, error_info, level='warning')
+
+    return api_response({
+        'music_languages': MUSIC_LANGUAGES,
+        'genres': sorted(genres),
+        'markets': MARKETS,
+        'fitness_levels': FITNESS_LEVELS,
+        'age_groups': AGE_GROUPS,
+    }, 200)
 

@@ -25,12 +25,21 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-ajznvh!hvi)c9+p%0mp*f8q$e-477b=_3v$yzl$m!^^)-8uj4#'
+# Set SECRET_KEY in the environment on Render (and never commit real secrets).
+SECRET_KEY = config(
+    'SECRET_KEY',
+    default='django-insecure-ajznvh!hvi)c9+p%0mp*f8q$e-477b=_3v$yzl$m!^^)-8uj4#',
+)
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Set DEBUG=False in production (e.g. Render). Defaults to True for local dev without .env.
+DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = []
+# Comma-separated hosts, or * alone (dev only — e.g. HTTPS tunnels like ngrok change hostname each run).
+_allowed_raw = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').strip()
+if _allowed_raw == '*':
+    ALLOWED_HOSTS = ['*']
+else:
+    ALLOWED_HOSTS = [h.strip() for h in _allowed_raw.split(',') if h.strip()]
 
 
 # Application definition
@@ -50,7 +59,7 @@ INSTALLED_APPS = [
     
     # Local apps
     'users',
-    'journal',
+    'assistant',
     'emotions',
     'recommendations',
 ]
@@ -71,7 +80,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -109,7 +118,8 @@ if NEON_DATABASE_URL:
     DATABASES = {
         "default": dj_database_url.parse(
             NEON_DATABASE_URL,
-            conn_max_age=600,
+            conn_max_age=300,
+            conn_health_checks=True,
         )
     }
 else:
@@ -207,6 +217,21 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
+# Optional: e.g. http://192.168.1.10:3000 (same origin you open on the phone)
+_cors_extra = config('CORS_ALLOWED_ORIGINS_EXTRA', default='')
+if _cors_extra.strip():
+    CORS_ALLOWED_ORIGINS += [o.strip() for o in _cors_extra.split(',') if o.strip()]
+
+# In DEBUG, allow typical LAN dev URLs and HTTPS tunnels (ngrok / Cloudflare) for mobile camera testing
+if DEBUG:
+    CORS_ALLOWED_ORIGIN_REGEXES = [
+        r'^http://(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?$',
+        r'^https://[a-zA-Z0-9-]+\.ngrok-free\.app$',
+        r'^https://[a-zA-Z0-9-]+\.ngrok\.io$',
+        r'^https://[a-zA-Z0-9-]+\.ngrok-free\.dev$',
+        r'^https://[a-zA-Z0-9-]+\.trycloudflare\.com$',
+        r'^https://[a-zA-Z0-9-]+\.loca\.lt$',
+    ]
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -221,3 +246,34 @@ EMOTION_7CLASS_MICROSERVICE_URL = config('EMOTION_7CLASS_MICROSERVICE_URL', defa
 # Recommendation Microservice Settings
 RECOMMENDATION_MICROSERVICE_URL = config('RECOMMENDATION_MICROSERVICE_URL', default='http://localhost:5000/api')
 TEXT_EMOTION_MICROSERVICE_URL = config('TEXT_EMOTION_MICROSERVICE_URL', default='http://localhost:5001')
+# Audio / voice emotion (Wav2Vec2) microservice
+VOICE_EMOTION_MICROSERVICE_URL = config('VOICE_EMOTION_MICROSERVICE_URL', default='http://127.0.0.1:5003')
+
+# Frontend base URL (links in emails / push payloads)
+FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
+
+# Email (SendGrid via SMTP — use SENDGRID_API_KEY + verified sender)
+SENDGRID_API_KEY = config('SENDGRID_API_KEY', default='')
+SENDGRID_FROM_EMAIL = config('SENDGRID_FROM_EMAIL', default='')
+DEFAULT_FROM_EMAIL = (
+    config('DEFAULT_FROM_EMAIL', default='').strip()
+    or SENDGRID_FROM_EMAIL
+    or 'EmotionAI <no-reply@localhost>'
+)
+if SENDGRID_API_KEY:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = 'smtp.sendgrid.net'
+    EMAIL_PORT = 587
+    EMAIL_USE_TLS = True
+    EMAIL_HOST_USER = 'apikey'
+    EMAIL_HOST_PASSWORD = SENDGRID_API_KEY
+else:
+    EMAIL_BACKEND = config(
+        'EMAIL_BACKEND',
+        default='django.core.mail.backends.console.EmailBackend',
+    )
+
+# Web Push (VAPID) — generate with: pywebpush.vapid._get_vapid_keys() or openssl
+WEB_PUSH_PUBLIC_KEY = config('WEB_PUSH_PUBLIC_KEY', default='')
+WEB_PUSH_PRIVATE_KEY = config('WEB_PUSH_PRIVATE_KEY', default='')
+WEB_PUSH_ADMIN_CONTACT = config('WEB_PUSH_ADMIN_CONTACT', default='mailto:support@example.com')

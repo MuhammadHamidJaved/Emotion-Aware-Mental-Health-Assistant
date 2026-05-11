@@ -1,4 +1,5 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8000';
+/** Base URL for the Django API (use your PC's LAN IP when testing from a phone). */
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8000';
 
 export type User = {
   id: number;
@@ -12,10 +13,11 @@ export type User = {
   date_of_birth?: string | null;
   phone_number?: string | null;
   mental_health_concerns?: string[];
-  journaling_goals?: string[];
-  preferred_journal_time?: string | null;
+  mood_tracking_goals?: string[];
+  preferred_checkin_time?: string | null;
   enable_biometric?: boolean;
   enable_notifications?: boolean;
+  onboarding_complete?: boolean;
   total_entries?: number;
   current_streak?: number;
   longest_streak?: number;
@@ -334,8 +336,8 @@ export async function apiGetRecentEntries(
   }
 }
 
-// Journal Entries API types
-export type JournalEntry = {
+// assistant Entries API types
+export type CheckInEntry = {
   id: number;
   entry_type: 'text' | 'voice' | 'video';
   title?: string;
@@ -352,18 +354,18 @@ export type JournalEntry = {
   is_draft?: boolean;
 };
 
-// Journal Entries API functions
-export async function apiGetJournalEntries(
+// assistant Entries API functions
+export async function apiGetCheckInEntries(
   accessToken: string,
   entryType?: string,
   emotion?: string
-): Promise<JournalEntry[]> {
+): Promise<CheckInEntry[]> {
   try {
     const params = new URLSearchParams();
     if (entryType) params.append('type', entryType);
     if (emotion) params.append('emotion', emotion);
     
-    const url = `${API_URL}/api/journal/entries/${params.toString() ? '?' + params.toString() : ''}`;
+    const url = `${API_URL}/api/assistant/entries/${params.toString() ? '?' + params.toString() : ''}`;
     const res = await fetch(url, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -371,13 +373,58 @@ export async function apiGetJournalEntries(
     });
 
     if (!res.ok) {
-      throw new Error('Failed to load journal entries.');
+      throw new Error('Failed to load assistant entries.');
     }
 
     return res.json();
   } catch (error) {
-    console.error('Error fetching journal entries:', error);
+    console.error('Error fetching assistant entries:', error);
     return [];
+  }
+}
+
+export async function apiGetCheckInEntry(accessToken: string, entryId: number): Promise<CheckInEntry> {
+  const res = await fetch(`${API_URL}/api/assistant/entries/${entryId}/`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || err.message || err.detail || 'Failed to load entry.');
+  }
+  return res.json();
+}
+
+export async function apiCreateCheckInEntry(
+  accessToken: string,
+  body: Record<string, unknown>
+): Promise<CheckInEntry> {
+  const res = await fetch(`${API_URL}/api/assistant/entries/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || err.message || err.detail || err.text_content?.[0] || 'Failed to save entry.');
+  }
+  return res.json();
+}
+
+export async function apiDeleteCheckInEntry(accessToken: string, entryId: number): Promise<void> {
+  const res = await fetch(`${API_URL}/api/assistant/entries/${entryId}/`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  if (!res.ok && res.status !== 404) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || err.message || 'Failed to delete entry.');
   }
 }
 
@@ -528,7 +575,7 @@ export type ProfileSettings = {
 };
 
 export type NotificationSettings = {
-  session_reminders: boolean;  // Changed from journal_reminders
+  session_reminders: boolean;  // Changed from assistant_reminders
   mood_insights: boolean;
   weekly_reports: boolean;
   streak_alerts: boolean;
@@ -548,6 +595,24 @@ export type AppearanceSettings = {
   mood_adaptive: boolean;
   dark_mode: boolean;
   color_scheme: 'default' | 'warm' | 'cool';
+};
+
+export type RecommendationSettings = {
+  music_language: string;
+  music_genres: string[];
+  favorite_artists: string[];
+  market: string;
+  fitness_level: 'beginner' | 'moderate' | 'advanced';
+  age_group: string | null;
+  content_language: string;
+};
+
+export type RecommendationOptions = {
+  music_languages: { value: string; label: string }[];
+  genres: string[];
+  markets: { code: string; name: string }[];
+  fitness_levels: string[];
+  age_groups: { value: string; label: string }[];
 };
 
 // Settings API functions
@@ -700,7 +765,57 @@ export async function apiUpdateAppearanceSettings(
   return res.json();
 }
 
-export async function apiExportData(accessToken: string): Promise<{ message: string }> {
+export async function apiGetRecommendationSettings(accessToken: string): Promise<RecommendationSettings> {
+  const res = await fetch(`${API_URL}/api/settings/recommendations/`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to load recommendation settings.');
+  }
+
+  return res.json();
+}
+
+export async function apiUpdateRecommendationSettings(
+  accessToken: string,
+  settings: Partial<RecommendationSettings>
+): Promise<{ message: string; settings: RecommendationSettings }> {
+  const res = await fetch(`${API_URL}/api/settings/recommendations/`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(settings),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to update recommendation settings.');
+  }
+
+  return res.json();
+}
+
+export async function apiGetRecommendationOptions(accessToken: string): Promise<RecommendationOptions> {
+  const res = await fetch(`${API_URL}/api/settings/recommendations/options/`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to load recommendation options.');
+  }
+
+  return res.json();
+}
+
+/** Downloads EmotionAI user data as a JSON file (browser save dialog). */
+export async function apiExportData(accessToken: string): Promise<void> {
   const res = await fetch(`${API_URL}/api/settings/export-data/`, {
     method: 'POST',
     headers: {
@@ -709,13 +824,32 @@ export async function apiExportData(accessToken: string): Promise<{ message: str
   });
 
   if (!res.ok) {
-    throw new Error('Failed to request data export.');
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to download data export.');
   }
 
-  return res.json();
+  const blob = await res.blob();
+  let filename = 'emotionai_export.json';
+  const cd = res.headers.get('Content-Disposition');
+  if (cd) {
+    const match = /filename="?([^";]+)"?/i.exec(cd);
+    if (match?.[1]) filename = match[1].trim();
+  }
+  const url = URL.createObjectURL(blob);
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
-export async function apiDeleteAccount(accessToken: string): Promise<{ message: string }> {
+export async function apiDeleteAccount(accessToken: string): Promise<{ message: string; deleted?: boolean }> {
   const res = await fetch(`${API_URL}/api/settings/delete-account/`, {
     method: 'POST',
     headers: {
@@ -724,7 +858,7 @@ export async function apiDeleteAccount(accessToken: string): Promise<{ message: 
   });
 
   if (!res.ok) {
-    throw new Error('Failed to request account deletion.');
+    throw new Error('Failed to delete account.');
   }
 
   return res.json();
@@ -838,18 +972,23 @@ export async function apiGetNotifications(
   return res.json();
 }
 
+/** Used by polling; returns 0 when the API is unreachable (no throw — avoids noisy console / overlays). */
 export async function apiGetUnreadCount(accessToken: string): Promise<{ unread_count: number }> {
-  const res = await fetch(`${API_URL}/api/notifications/unread-count/`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  try {
+    const res = await fetch(`${API_URL}/api/notifications/unread-count/`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
 
-  if (!res.ok) {
-    throw new Error('Failed to load unread count.');
+    if (!res.ok) {
+      return { unread_count: 0 };
+    }
+
+    return res.json();
+  } catch {
+    return { unread_count: 0 };
   }
-
-  return res.json();
 }
 
 export async function apiMarkNotificationAsRead(
@@ -912,4 +1051,137 @@ export async function apiClearAllNotifications(
   return res.json();
 }
 
+// ── Personalized Recommendations API ──────────────────────────────────
 
+export type PersonalizedRecommendationRequest = {
+  emotion: string;
+  context?: Record<string, any>;
+  preferences?: Partial<RecommendationSettings>;
+  types?: ('music' | 'exercise' | 'quote' | 'meditation' | 'activity')[];
+};
+
+export type SpotifyTrack = {
+  id?: string;
+  title: string;
+  artist: string;
+  artists?: { name: string }[];
+  album?: string | { name: string; images?: { url: string }[] };
+  url: string;
+  preview_url: string | null;
+  duration_ms?: number;
+  duration?: string;
+  popularity?: number;
+  image_url?: string;
+  images?: { url: string }[];
+  bpm?: number;
+};
+
+export type ExerciseRecommendation = {
+  name: string;
+  category: string;
+  description: string;
+  duration?: string;
+  difficulty?: string;
+  icon?: string;
+};
+
+export type PersonalizedRecommendationResponse = {
+  recommendation_id?: string;
+  emotion: string;
+  recommendations: {
+    music?: {
+      tracks: SpotifyTrack[];
+      playlist_url?: string;
+      seed_genres?: string[];
+      search_queries_used?: string[];
+    };
+    exercise?: ExerciseRecommendation[];
+    quote?: string | string[];
+    meditation?: any;
+    activity?: any;
+  };
+  preferences_used: Record<string, any>;
+  personalization_applied?: Record<string, any>;
+};
+
+export async function apiGetPersonalizedRecommendations(
+  accessToken: string,
+  request: PersonalizedRecommendationRequest
+): Promise<PersonalizedRecommendationResponse> {
+  const res = await fetch(`${API_URL}/api/recommendations/get/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch personalized recommendations.');
+  }
+
+  return res.json();
+}
+
+export type RecommendationFeedback = {
+  recommendation_id: string;
+  item_id?: string;
+  rating?: number;
+  feedback_type: 'like' | 'dislike' | 'skip' | 'complete';
+  recommendation_type: 'music' | 'exercise' | 'quote' | 'meditation' | 'activity';
+};
+
+export async function apiSendRecommendationFeedback(
+  accessToken: string,
+  feedback: RecommendationFeedback
+): Promise<{ message: string }> {
+  const res = await fetch(`${API_URL}/api/recommendations/feedback/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(feedback),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to send feedback.');
+  }
+
+  return res.json();
+}
+
+export async function apiGetRecommendationHistory(
+  accessToken: string
+): Promise<any> {
+  const res = await fetch(`${API_URL}/api/recommendations/history/`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to load recommendation history.');
+  }
+
+  return res.json();
+}
+
+export async function apiGetRecommendationPatterns(
+  accessToken: string
+): Promise<any> {
+  const res = await fetch(`${API_URL}/api/recommendations/patterns/`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to load recommendation patterns.');
+  }
+
+  return res.json();
+}

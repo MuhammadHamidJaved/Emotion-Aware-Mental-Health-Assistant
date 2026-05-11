@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { Play, Pause, SkipForward, Volume2, Heart, Music, Clock, TrendingUp } from 'lucide-react';
+import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Play, Pause, SkipForward, Volume2, Heart, Music, Clock, TrendingUp, Loader2, ExternalLink } from 'lucide-react';
+import { apiGetPersonalizedRecommendations, apiSendRecommendationFeedback, apiGetRecommendationSettings, type SpotifyTrack, type RecommendationSettings } from '@/lib/api';
 
 interface Track {
   id: string;
@@ -12,9 +14,15 @@ interface Track {
   genre: string;
   bpm: number;
   coverColor: string;
+  url?: string;
+  youtubeUrl?: string;
+  youtubeSearchUrl?: string;
+  preview_url?: string | null;
+  coverImage?: string | null;
 }
 
-const MUSIC_LIBRARY: Record<string, Track[]> = {
+// Fallback tracks when microservice is unavailable
+const FALLBACK_TRACKS: Record<string, Track[]> = {
   happy: [
     { id: '1', title: 'Walking on Sunshine', artist: 'Katrina and the Waves', duration: '3:58', emotion: 'happy', genre: 'Pop', bpm: 120, coverColor: 'bg-yellow-500' },
     { id: '2', title: 'Good Vibrations', artist: 'The Beach Boys', duration: '3:36', emotion: 'happy', genre: 'Rock', bpm: 128, coverColor: 'bg-yellow-400' },
@@ -44,11 +52,183 @@ const MUSIC_LIBRARY: Record<string, Track[]> = {
   ],
 };
 
-export default function MusicPage() {
-  const [selectedEmotion, setSelectedEmotion] = useState<string>('calm');
+const EMOTION_COVER_COLORS: Record<string, string> = {
+  happy: 'bg-yellow-500', calm: 'bg-teal-500', anxious: 'bg-purple-500',
+  sad: 'bg-blue-500', energetic: 'bg-orange-500',
+};
+
+function formatDuration(ms?: number, raw?: string): string {
+  if (ms) return `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`;
+  return raw || '0:00';
+}
+
+function normalizeSpotifyLink(url?: string | null): string | undefined {
+  if (!url) return undefined;
+
+  if (url.includes('open.spotify.com/')) {
+    return url;
+  }
+
+  const uriMatch = url.match(/^spotify:(track|album|playlist):([A-Za-z0-9]+)$/);
+  if (uriMatch) {
+    return `https://open.spotify.com/${uriMatch[1]}/${uriMatch[2]}`;
+  }
+
+  const apiMatch = url.match(/api\.spotify\.com\/v1\/(tracks|albums|playlists)\/([A-Za-z0-9]+)/);
+  if (apiMatch) {
+    const typeMap: Record<string, string> = {
+      tracks: 'track',
+      albums: 'album',
+      playlists: 'playlist',
+    };
+    return `https://open.spotify.com/${typeMap[apiMatch[1]]}/${apiMatch[2]}`;
+  }
+
+  return undefined;
+}
+
+function normalizeYouTubeEmbedLink(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return undefined;
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  let videoId = '';
+
+  if (host.includes('youtu.be')) {
+    videoId = parsed.pathname.replace('/', '').trim();
+  } else if (host.includes('youtube.com')) {
+    if (parsed.pathname.startsWith('/watch')) {
+      videoId = (parsed.searchParams.get('v') || '').trim();
+    } else if (parsed.pathname.startsWith('/shorts/')) {
+      videoId = parsed.pathname.replace('/shorts/', '').split('/')[0].trim();
+    } else if (parsed.pathname.startsWith('/embed/')) {
+      videoId = parsed.pathname.replace('/embed/', '').split('/')[0].trim();
+    }
+  }
+
+  if (!videoId) return undefined;
+  return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
+}
+
+function normalizeYouTubeSearchLink(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return undefined;
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  if (!host.includes('youtube.com') || !parsed.pathname.startsWith('/results')) return undefined;
+  const query = (parsed.searchParams.get('search_query') || '').trim();
+  if (!query) return undefined;
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+}
+
+function spotifyToTrack(t: SpotifyTrack, idx: number, emotion: string): Track {
+  // Handle album as either string or object (API returns flat string)
+  const albumImage = typeof t.album === 'object' && t.album?.images?.[0]?.url
+    ? t.album.images[0].url
+    : null;
+  const coverImage = t.image_url || albumImage || t.images?.[0]?.url || null;
+
+  return {
+    id: t.id || `api-${idx}`,
+    title: t.title || 'Unknown Track',
+    artist: t.artist || t.artists?.[0]?.name || 'Unknown Artist',
+    duration: formatDuration(t.duration_ms, t.duration),
+    emotion,
+    genre: '',
+    bpm: t.bpm || 0,
+    coverColor: EMOTION_COVER_COLORS[emotion] || 'bg-purple-500',
+    url: normalizeSpotifyLink(t.url),
+    youtubeUrl: normalizeYouTubeEmbedLink(t.url),
+    youtubeSearchUrl: normalizeYouTubeSearchLink(t.url),
+    preview_url: t.preview_url,
+    coverImage,
+  };
+}
+
+function MusicPageContent() {
+  const searchParams = useSearchParams();
+
+  // Valid tab keys on this page
+  const VALID_TAB_EMOTIONS = ['calm', 'happy', 'anxious', 'sad', 'energetic'] as const;
+  // Map incoming emotions to the closest music tab
+  const EMOTION_TAB_MAP: Record<string, string> = {
+    neutral: 'calm', tired: 'calm', relaxed: 'calm', peaceful: 'calm', content: 'calm',
+    frustrated: 'sad', lonely: 'sad', melancholic: 'sad', heartbroken: 'sad', depressed: 'sad',
+    excited: 'happy', grateful: 'happy', hopeful: 'happy', love: 'happy',
+    fear: 'anxious', stressed: 'anxious', confused: 'anxious', overwhelmed: 'anxious',
+    motivated: 'energetic', bored: 'energetic', angry: 'energetic', energetic: 'energetic',
+  };
+
+  const normalizeToTabEmotion = (emotion: string | null): string => {
+    const source = (emotion || '').toLowerCase().trim();
+    if (!source) return 'calm';
+    if ((VALID_TAB_EMOTIONS as readonly string[]).includes(source)) return source;
+    return EMOTION_TAB_MAP[source] || 'calm';
+  };
+
+  // urlEmotion is the raw emotion from URL (may be outside tab list)
+  const urlEmotionRaw = searchParams?.get('emotion') || null;
+
+  const [selectedEmotion, setSelectedEmotion] = useState<string>(normalizeToTabEmotion(urlEmotionRaw));
+  const [predictedEmotionLabel, setPredictedEmotionLabel] = useState<string>((urlEmotionRaw || '').trim());
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [trackDuration, setTrackDuration] = useState(0);
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [apiTracks, setApiTracks] = useState<Track[]>([]);
+  const [playlistUrl, setPlaylistUrl] = useState<string | null>(null);
+  const [recommendationId, setRecommendationId] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [usingFallback, setUsingFallback] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [userPrefs, setUserPrefs] = useState<Partial<RecommendationSettings>>({});
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Load saved user preferences on mount so they are forwarded explicitly to
+  // the microservice (ensures favorite_artists + music_language are both used).
+  useEffect(() => {
+    const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (!accessToken) return;
+    apiGetRecommendationSettings(accessToken)
+      .then(prefs => setUserPrefs(prefs))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    // Always lock this page to AI-provided emotion context.
+    const fromUrl = (searchParams?.get('emotion') || '').trim();
+    if (fromUrl) {
+      setPredictedEmotionLabel(fromUrl);
+      setSelectedEmotion(normalizeToTabEmotion(fromUrl));
+      return;
+    }
+
+    if (typeof window === 'undefined') return;
+    const stored = localStorage.getItem('lastRecommendations');
+    if (!stored) return;
+
+    try {
+      const parsed = JSON.parse(stored);
+      const detected = (parsed?.emotion || '').trim();
+      if (detected) {
+        setPredictedEmotionLabel(detected);
+        setSelectedEmotion(normalizeToTabEmotion(detected));
+      }
+    } catch {
+      // Ignore malformed local cache.
+    }
+  }, [searchParams]);
 
   const emotions = [
     { key: 'calm', label: 'Calm & Relax', emoji: '😌', color: 'teal', description: 'Soothing music to reduce stress' },
@@ -58,16 +238,148 @@ export default function MusicPage() {
     { key: 'energetic', label: 'Energy Boost', emoji: '⚡', color: 'orange', description: 'Motivating tracks to energize' },
   ];
 
-  const currentTracks = MUSIC_LIBRARY[selectedEmotion] || [];
+  const fetchPersonalizedMusic = useCallback(async (emotion: string) => {
+    const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (!accessToken) {
+      setUsingFallback(true);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setUsingFallback(false);
+
+    try {
+      const data = await apiGetPersonalizedRecommendations(accessToken, {
+        // Use the raw URL emotion if available (richer personalization), else the tab emotion
+        emotion: urlEmotionRaw || emotion,
+        types: ['music'],
+        // Explicitly forward saved preferences so the microservice uses
+        // BOTH music_language AND favorite_artists.
+        preferences: {
+          music_language: userPrefs.music_language,
+          music_genres: userPrefs.music_genres,
+          favorite_artists: userPrefs.favorite_artists,
+          market: userPrefs.market,
+        },
+      });
+
+      const musicData = data.recommendations?.music;
+      if (musicData?.tracks && musicData.tracks.length > 0) {
+        const tracks = musicData.tracks.map((t, idx) => spotifyToTrack(t, idx, emotion));
+        setApiTracks(tracks);
+        setPlaylistUrl(normalizeSpotifyLink(musicData.playlist_url) || null);
+        setRecommendationId(data.recommendation_id || '');
+      } else {
+        // No tracks from API — use fallback
+        setUsingFallback(true);
+        setApiTracks([]);
+        setPlaylistUrl(null);
+      }
+    } catch (err: unknown) {
+      console.error('Failed to fetch personalized music:', err);
+      const message = err instanceof Error ? err.message : 'Could not load personalized music';
+      setError(message);
+      setUsingFallback(true);
+      setApiTracks([]);
+      setPlaylistUrl(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [userPrefs, urlEmotionRaw]);
+
+  // Fetch when emotion changes
+  useEffect(() => {
+    setCurrentTrack(null);
+    setIsPlaying(false);
+    fetchPersonalizedMusic(selectedEmotion);
+  }, [selectedEmotion, fetchPersonalizedMusic]);
+
+  const currentTracks = usingFallback
+    ? (FALLBACK_TRACKS[selectedEmotion] || [])
+    : apiTracks;
 
   const handlePlayPause = (track: Track) => {
+    const stopCurrentAudio = () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+      setIsPlaying(false);
+      setCurrentTime(0);
+    };
+
     if (currentTrack?.id === track.id) {
-      setIsPlaying(!isPlaying);
+      if (track.youtubeUrl) {
+        setIsPlaying(prev => !prev);
+        return;
+      }
+
+      if (!audioRef.current || !track.preview_url) {
+        const fallbackLink = track.youtubeSearchUrl || track.url;
+        if (fallbackLink) window.open(fallbackLink, '_blank', 'noopener,noreferrer');
+        return;
+      }
+
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play().catch(() => {
+          setIsPlaying(false);
+        });
+      }
+      return;
     } else {
+      stopCurrentAudio();
       setCurrentTrack(track);
-      setIsPlaying(true);
+
+      if (track.youtubeUrl) {
+        setTrackDuration(0);
+        setCurrentTime(0);
+        setIsPlaying(true);
+        return;
+      }
+
+      if (track.preview_url) {
+        const audio = new Audio(track.preview_url);
+        audioRef.current = audio;
+
+        audio.addEventListener('loadedmetadata', () => {
+          setTrackDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
+        });
+        audio.addEventListener('timeupdate', () => {
+          setCurrentTime(audio.currentTime || 0);
+        });
+        audio.addEventListener('ended', () => {
+          setIsPlaying(false);
+          setCurrentTime(0);
+        });
+
+        audio.play().then(() => {
+          setIsPlaying(true);
+        }).catch(() => {
+          setIsPlaying(false);
+        });
+        return;
+      }
+
+      // No preview available, open Spotify directly.
+      const fallbackLink = track.youtubeSearchUrl || track.url;
+      if (fallbackLink) {
+        window.open(fallbackLink, '_blank', 'noopener,noreferrer');
+      }
+      setIsPlaying(false);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   const toggleFavorite = (trackId: string) => {
     setFavorites(prev =>
@@ -75,219 +387,305 @@ export default function MusicPage() {
         ? prev.filter(id => id !== trackId)
         : [...prev, trackId]
     );
+
+    // Send feedback to microservice
+    const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (accessToken && !usingFallback) {
+      apiSendRecommendationFeedback(accessToken, {
+        recommendation_id: recommendationId,
+        item_id: trackId,
+        feedback_type: favorites.includes(trackId) ? 'dislike' : 'like',
+        recommendation_type: 'music',
+      }).catch(() => {});
+    }
   };
 
+  const activeEmotion = emotions.find(e => e.key === selectedEmotion);
+
+  const MOOD_ACCENT: Record<string, { bg: string; text: string; light: string }> = {
+    calm:     { bg: 'bg-teal-500',   text: 'text-teal-600',   light: 'bg-teal-50 border-teal-200' },
+    happy:    { bg: 'bg-yellow-400', text: 'text-yellow-600', light: 'bg-yellow-50 border-yellow-200' },
+    anxious:  { bg: 'bg-purple-500', text: 'text-purple-600', light: 'bg-purple-50 border-purple-200' },
+    sad:      { bg: 'bg-blue-500',   text: 'text-blue-600',   light: 'bg-blue-50 border-blue-200' },
+    energetic:{ bg: 'bg-orange-500', text: 'text-orange-600', light: 'bg-orange-50 border-orange-200' },
+  };
+  const accent = MOOD_ACCENT[selectedEmotion] || MOOD_ACCENT.calm;
+
   return (
-    <div className="min-h-screen bg-white text-black p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-              <Music className="w-6 h-6 text-white" />
+    <div className="min-h-[calc(100vh-4rem)] bg-neutral-50 text-black -mx-4 sm:-mx-6">
+      <div className="border-b border-neutral-200 bg-white px-4 sm:px-6 py-3.5">
+        <div className="mx-auto flex max-w-6xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 shadow-sm">
+              <Music className="h-4 w-4 text-white" />
             </div>
-            <div>
-              <h1 className="text-3xl font-bold">Music Therapy</h1>
-              <p className="text-gray-600">Personalized playlists based on your emotions</p>
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold leading-tight text-neutral-900">Music Therapy</h1>
+              <p className="mt-0.5 truncate text-xs text-neutral-500">
+                {usingFallback ? 'Default library · personalize in Settings' : 'Mood-matched tracks'}
+              </p>
             </div>
           </div>
+          {playlistUrl && (
+            <a
+              href={playlistUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 self-start rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 transition-colors hover:bg-emerald-100 sm:self-auto"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Open Spotify playlist
+            </a>
+          )}
         </div>
+      </div>
 
-        {/* Emotion Selector */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-4">Choose Your Mood</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {emotions.map((emotion) => (
-              <button
-                key={emotion.key}
-                onClick={() => setSelectedEmotion(emotion.key)}
-                className={`p-4 rounded-lg border-2 transition-all text-left ${
-                  selectedEmotion === emotion.key
-                    ? 'border-black bg-gray-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className="text-3xl mb-2">{emotion.emoji}</div>
-                <div className="font-semibold mb-1">{emotion.label}</div>
-                <div className="text-xs text-gray-600">{emotion.description}</div>
-              </button>
-            ))}
+      <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 sm:py-5">
+        {/* Banners */}
+        {usingFallback && !isLoading && (
+          <div className="mb-3 rounded-lg border border-amber-200/80 bg-amber-50/90 px-3 py-2 text-xs text-amber-900 leading-snug sm:text-sm">
+            <span className="mr-1">⚠️</span>
+            Default playlist.{' '}
+            <a href="/settings" className="font-medium underline underline-offset-2">
+              Set preferences
+            </a>{' '}
+            for personalized music.
           </div>
+        )}
+        {predictedEmotionLabel && !usingFallback && !isLoading && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-indigo-200/80 bg-indigo-50/90 px-3 py-2 text-xs text-indigo-900 sm:text-sm">
+            <span>✨</span>
+            <span>
+              For <strong className="capitalize">{predictedEmotionLabel}</strong> from your check-in.
+            </span>
+          </div>
+        )}
+
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-medium text-neutral-500 sm:text-xs">Mood</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-neutral-900 bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white shadow-sm">
+            <span>{activeEmotion?.emoji}</span>
+            {activeEmotion?.label}
+          </span>
         </div>
 
-        {/* Track List */}
-        <div className="grid lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold">
-                {emotions.find(e => e.key === selectedEmotion)?.label} Playlist
-              </h2>
-              <span className="text-sm text-gray-600">{currentTracks.length} tracks</span>
+        <div className="grid gap-4 lg:grid-cols-[1fr_minmax(0,280px)] lg:gap-5">
+
+          <div className="order-1 overflow-hidden rounded-xl border border-neutral-200 bg-white lg:order-none">
+            <div className="flex items-center justify-between gap-2 border-b border-neutral-100 px-3 py-3 sm:px-4">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${accent.bg}`}>
+                  <Music className="h-4 w-4 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="truncate text-sm font-semibold text-neutral-900">{activeEmotion?.label} playlist</h2>
+                  <p className="truncate text-[11px] text-neutral-500 sm:text-xs">{currentTracks.length} tracks</p>
+                </div>
+              </div>
             </div>
 
-            <div className="space-y-3">
-              {currentTracks.map((track) => (
-                <div
-                  key={track.id}
-                  className={`border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all ${
-                    currentTrack?.id === track.id ? 'bg-gray-50 border-black' : ''
-                  }`}
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center py-12 sm:py-16">
+                <Loader2 className="mb-2 h-6 w-6 animate-spin text-neutral-300" />
+                <p className="text-xs text-neutral-500 sm:text-sm">Loading tracks…</p>
+              </div>
+            ) : currentTracks.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-neutral-400">
+                <Music className="mb-2 h-9 w-9 text-neutral-200" />
+                <p className="text-sm">No tracks for this mood.</p>
+                <button
+                  type="button"
+                  onClick={() => fetchPersonalizedMusic(selectedEmotion)}
+                  className="mt-2 text-xs font-medium text-neutral-900 underline underline-offset-2"
                 >
-                  <div className="flex items-center gap-4">
-                    {/* Album Art */}
-                    <div className={`w-16 h-16 ${track.coverColor} rounded-lg flex items-center justify-center flex-shrink-0`}>
-                      <Music className="w-8 h-8 text-white" />
-                    </div>
-
-                    {/* Track Info */}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold truncate">{track.title}</h3>
-                      <p className="text-sm text-gray-600 truncate">{track.artist}</p>
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className="text-xs text-gray-500">{track.genre}</span>
-                        <span className="text-xs text-gray-400">•</span>
-                        <span className="text-xs text-gray-500">{track.bpm} BPM</span>
-                        <span className="text-xs text-gray-400">•</span>
-                        <span className="text-xs text-gray-500">{track.duration}</span>
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => toggleFavorite(track.id)}
-                        className={`p-2 rounded-lg transition-colors ${
-                          favorites.includes(track.id)
-                            ? 'text-red-500 hover:bg-red-50'
-                            : 'text-gray-400 hover:bg-gray-100'
-                        }`}
-                      >
-                        <Heart
-                          className={`w-5 h-5 ${favorites.includes(track.id) ? 'fill-current' : ''}`}
-                        />
-                      </button>
-                      <button
-                        onClick={() => handlePlayPause(track)}
-                        className="p-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
-                      >
-                        {currentTrack?.id === track.id && isPlaying ? (
-                          <Pause className="w-5 h-5" />
-                        ) : (
-                          <Play className="w-5 h-5" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Now Playing / Info Sidebar */}
-          <div className="space-y-6">
-            {/* Now Playing */}
-            {currentTrack ? (
-              <div className="border border-gray-200 rounded-lg p-6 sticky top-24">
-                <h3 className="font-semibold mb-4">Now Playing</h3>
-                <div className={`w-full h-48 ${currentTrack.coverColor} rounded-lg flex items-center justify-center mb-4`}>
-                  <Music className="w-24 h-24 text-white" />
-                </div>
-                <h4 className="font-bold text-lg mb-1">{currentTrack.title}</h4>
-                <p className="text-gray-600 mb-4">{currentTrack.artist}</p>
-
-                {/* Progress Bar */}
-                <div className="mb-4">
-                  <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                    <div className="w-1/3 h-full bg-black rounded-full"></div>
-                  </div>
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
-                    <span>1:23</span>
-                    <span>{currentTrack.duration}</span>
-                  </div>
-                </div>
-
-                {/* Controls */}
-                <div className="flex items-center justify-center gap-4">
-                  <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                    <Volume2 className="w-5 h-5 text-gray-600" />
-                  </button>
-                  <button
-                    onClick={() => setIsPlaying(!isPlaying)}
-                    className="p-4 bg-black text-white rounded-full hover:bg-gray-800 transition-colors"
-                  >
-                    {isPlaying ? (
-                      <Pause className="w-6 h-6" />
-                    ) : (
-                      <Play className="w-6 h-6" />
-                    )}
-                  </button>
-                  <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                    <SkipForward className="w-5 h-5 text-gray-600" />
-                  </button>
-                </div>
+                  Try again
+                </button>
               </div>
             ) : (
-              <div className="border border-gray-200 rounded-lg p-6 text-center">
-                <Music className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500 text-sm">Select a track to start listening</p>
+              <div className="divide-y divide-neutral-100 bg-neutral-50/40">
+                {currentTracks.map((track, idx) => {
+                  const isActive = currentTrack?.id === track.id;
+                  return (
+                    <div key={track.id}
+                      className={`group flex cursor-pointer items-center gap-2 px-3 py-2.5 transition-colors hover:bg-white sm:gap-3 sm:px-4 sm:py-3 ${isActive ? 'bg-white shadow-[inset_2px_0_0_0_#111827]' : ''}`}
+                      onClick={() => handlePlayPause(track)}>
+                      {/* Track number / play indicator */}
+                      <div className="w-6 text-center flex-shrink-0">
+                        {isActive && isPlaying
+                          ? <div className="flex items-end justify-center gap-0.5 h-4">
+                              <span className="w-1 bg-black rounded-full animate-bounce" style={{height:'60%', animationDelay:'0ms'}} />
+                              <span className="w-1 bg-black rounded-full animate-bounce" style={{height:'100%', animationDelay:'150ms'}} />
+                              <span className="w-1 bg-black rounded-full animate-bounce" style={{height:'40%', animationDelay:'300ms'}} />
+                            </div>
+                          : <span className={`text-xs ${isActive ? 'text-black font-bold' : 'text-gray-400 group-hover:hidden'}`}>{idx + 1}</span>
+                        }
+                        {!isActive && <Play className="w-3.5 h-3.5 text-gray-600 hidden group-hover:block" />}
+                      </div>
+
+                      {/* Album art */}
+                      {track.coverImage
+                        ? <img src={track.coverImage} alt={track.title} className="w-10 h-10 rounded-md object-cover flex-shrink-0" />
+                        : <div className={`w-10 h-10 ${track.coverColor} rounded-md flex items-center justify-center flex-shrink-0`}>
+                            <Music className="w-4 h-4 text-white" />
+                          </div>
+                      }
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium truncate ${isActive ? 'text-black' : 'text-gray-800'}`}>{track.title}</p>
+                        <p className="text-xs text-gray-500 truncate">{track.artist}</p>
+                      </div>
+
+                      {/* Duration + actions */}
+                      <div className="flex items-center gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                        <span className="text-xs text-gray-400 w-9 text-right">{track.duration || '0:00'}</span>
+                        <button onClick={() => toggleFavorite(track.id)}
+                          className={`p-1.5 rounded-lg transition-colors ${favorites.includes(track.id) ? 'text-red-500' : 'text-gray-300 hover:text-gray-500'}`}>
+                          <Heart className={`w-4 h-4 ${favorites.includes(track.id) ? 'fill-current' : ''}`} />
+                        </button>
+                        {track.url && (
+                          <a href={track.url} target="_blank" rel="noopener noreferrer"
+                            className="p-1.5 text-gray-300 hover:text-green-600 rounded-lg transition-colors">
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
+          </div>
 
-            {/* Music Benefits */}
-            <div className="border border-gray-200 rounded-lg p-6">
-              <h3 className="font-semibold mb-4">Music Therapy Benefits</h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex items-start gap-2">
-                  <div className="w-5 h-5 bg-green-100 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <TrendingUp className="w-3 h-3 text-green-600" />
+          <div className="order-2 space-y-3 lg:order-none lg:self-start">
+            <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
+              {currentTrack ? (
+                <>
+                  {/* Art */}
+                  {currentTrack.youtubeUrl && isPlaying ? (
+                    <div className="w-full aspect-square bg-black">
+                      <iframe
+                        title={`${currentTrack.title} - YouTube player`}
+                        src={currentTrack.youtubeUrl}
+                        className="h-full w-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        referrerPolicy="strict-origin-when-cross-origin"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : currentTrack.coverImage
+                    ? <img src={currentTrack.coverImage} alt={currentTrack.title} className="w-full aspect-square object-cover" />
+                    : <div className={`w-full aspect-square ${currentTrack.coverColor} flex items-center justify-center`}>
+                        <Music className="w-16 h-16 text-white/60" />
+                      </div>
+                  }
+                  <div className="p-4">
+                    <p className="font-bold text-sm truncate">{currentTrack.title}</p>
+                    <p className="text-xs text-gray-500 truncate mt-0.5">{currentTrack.artist}</p>
+                    {/* Live progress bar (preview playback only) */}
+                    <div className="mt-3 mb-3">
+                      <div className="w-full bg-gray-100 rounded-full h-1">
+                        <div
+                          className="h-full bg-black rounded-full transition-all"
+                          style={{ width: `${trackDuration > 0 ? Math.min(100, (currentTime / trackDuration) * 100) : 0}%` }}
+                        />
+                      </div>
+                      {isPlaying && currentTrack.preview_url && (
+                        <div className="flex justify-between text-xs text-gray-400 mt-1">
+                          <span>{formatDuration(Math.floor(currentTime * 1000))}</span>
+                          <span>{formatDuration(Math.floor((trackDuration || 0) * 1000), currentTrack.duration)}</span>
+                        </div>
+                      )}
+                    </div>
+                    {/* Controls */}
+                    <div className="flex items-center justify-between">
+                      <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                        <Volume2 className="w-4 h-4 text-gray-400" />
+                      </button>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => handlePlayPause(currentTrack)}
+                          className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center hover:bg-gray-800 transition-colors">
+                          {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+                        </button>
+                      </div>
+                      <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                        <SkipForward className="w-4 h-4 text-gray-400" />
+                      </button>
+                    </div>
+                    {currentTrack.url && (
+                      <a href={currentTrack.url} target="_blank" rel="noopener noreferrer"
+                        className={`mt-3 flex items-center justify-center gap-2 w-full py-2 text-white rounded-lg text-xs font-semibold transition-colors ${
+                          currentTrack.youtubeUrl ? 'bg-[#FF0000] hover:bg-[#cc0000]' : 'bg-[#1DB954] hover:bg-[#1aa34a]'
+                        }`}>
+                        <ExternalLink className="w-3.5 h-3.5" /> {currentTrack.youtubeUrl ? 'Open on YouTube' : 'Listen on Spotify'}
+                      </a>
+                    )}
                   </div>
-                  <div>
-                    <div className="font-medium">Reduces Stress</div>
-                    <div className="text-gray-600 text-xs">Lowers cortisol levels by up to 65%</div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-14 px-4 text-center">
+                  <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                    <Music className="w-6 h-6 text-gray-300" />
                   </div>
+                  <p className="text-sm font-medium text-gray-700">Nothing playing</p>
+                  <p className="text-xs text-gray-400 mt-1">Pick a track to start</p>
                 </div>
-                <div className="flex items-start gap-2">
-                  <div className="w-5 h-5 bg-blue-100 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Heart className="w-3 h-3 text-blue-600" />
+              )}
+            </div>
+
+            {/* Stats card */}
+            <div className="rounded-xl border border-neutral-200 bg-white p-3 sm:p-4">
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Session</h3>
+              <div className="space-y-2.5">
+                {[
+                  { label: 'Saved', value: favorites.length },
+                  { label: 'Total tracks', value: currentTracks.length },
+                  { label: 'Source', value: usingFallback ? 'Default' : 'Personalized' },
+                ].map(item => (
+                  <div key={item.label} className="flex justify-between items-center">
+                    <span className="text-xs text-gray-500">{item.label}</span>
+                    <span className="text-xs font-semibold">{item.value}</span>
                   </div>
-                  <div>
-                    <div className="font-medium">Improves Mood</div>
-                    <div className="text-gray-600 text-xs">Releases dopamine and serotonin</div>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2">
-                  <div className="w-5 h-5 bg-purple-100 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Clock className="w-3 h-3 text-purple-600" />
-                  </div>
-                  <div>
-                    <div className="font-medium">Better Sleep</div>
-                    <div className="text-gray-600 text-xs">Calming music improves sleep quality</div>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
 
-            {/* Listening Stats */}
-            <div className="border border-gray-200 rounded-lg p-6">
-              <h3 className="font-semibold mb-4">Your Stats</h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Minutes Listened</span>
-                  <span className="font-semibold">127</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Favorite Genre</span>
-                  <span className="font-semibold">Ambient</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Saved Tracks</span>
-                  <span className="font-semibold">{favorites.length}</span>
-                </div>
+            {/* Benefits */}
+            <div className="rounded-xl border border-neutral-200 bg-white p-3 sm:p-4">
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Benefits</h3>
+              <div className="space-y-2.5">
+                {[
+                  { icon: <TrendingUp className="w-3 h-3 text-green-600" />, bg: 'bg-green-100', label: 'Reduces Stress', sub: 'Lowers cortisol by 65%' },
+                  { icon: <Heart className="w-3 h-3 text-blue-600" />,     bg: 'bg-blue-100',  label: 'Boosts Mood',    sub: 'Releases dopamine' },
+                  { icon: <Clock className="w-3 h-3 text-purple-600" />,   bg: 'bg-purple-100',label: 'Better Sleep',   sub: 'Improves sleep quality' },
+                ].map(b => (
+                  <div key={b.label} className="flex items-center gap-2.5">
+                    <div className={`w-6 h-6 ${b.bg} rounded-md flex items-center justify-center flex-shrink-0`}>{b.icon}</div>
+                    <div>
+                      <p className="text-xs font-medium">{b.label}</p>
+                      <p className="text-xs text-gray-400">{b.sub}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function MusicPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" aria-label="Loading" />
+        </div>
+      }
+    >
+      <MusicPageContent />
+    </Suspense>
   );
 }

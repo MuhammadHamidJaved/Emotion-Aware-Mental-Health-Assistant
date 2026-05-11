@@ -1,6 +1,6 @@
 from django.db import models
 from django.conf import settings
-from journal.models import JournalEntry
+from assistant.models import CheckInEntry
 
 
 class EmotionDetection(models.Model):
@@ -14,7 +14,7 @@ class EmotionDetection(models.Model):
         ('fused', 'Multimodal Fusion'),
     )
     
-    entry = models.ForeignKey(JournalEntry, on_delete=models.CASCADE, related_name='emotion_detections')
+    entry = models.ForeignKey(CheckInEntry, on_delete=models.CASCADE, related_name='emotion_detections')
     modality = models.CharField(max_length=10, choices=MODALITY_CHOICES)
     
     # Emotion scores (0-1 probability)

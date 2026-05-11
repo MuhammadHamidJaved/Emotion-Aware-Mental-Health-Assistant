@@ -1,11 +1,35 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Music, Dumbbell, Quote, Play, Check, Clock, TrendingUp, Sparkles, BookmarkPlus, Bookmark, Brain } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Music, Dumbbell, Quote, Play, Check, Clock, TrendingUp, Sparkles, BookmarkPlus, Bookmark, Brain, Loader2, ExternalLink } from 'lucide-react';
+
 import MusicPlayer from '@/components/MusicPlayer';
+import { apiSendRecommendationFeedback } from '@/lib/api';
+
+function normalizeSpotifyLink(url?: string | null): string | null {
+  if (!url) return null;
+
+  if (url.includes('open.spotify.com/')) {
+    return url;
+  }
+
+  const uriMatch = url.match(/^spotify:(track|album|playlist):([A-Za-z0-9]+)$/);
+  if (uriMatch) {
+    return `https://open.spotify.com/${uriMatch[1]}/${uriMatch[2]}`;
+  }
+
+  const apiMatch = url.match(/api\.spotify\.com\/v1\/(tracks|albums|playlists)\/([A-Za-z0-9]+)/);
+  if (apiMatch) {
+    const typeMap: Record<string, string> = {
+      tracks: 'track',
+      albums: 'album',
+      playlists: 'playlist',
+    };
+    return `https://open.spotify.com/${typeMap[apiMatch[1]]}/${apiMatch[2]}`;
+  }
+
+  return null;
+}
 
 export default function PersonalizedRecommendationsPage() {
   const [bookmarkedMusic, setBookmarkedMusic] = useState<string[]>([]);
@@ -15,108 +39,89 @@ export default function PersonalizedRecommendationsPage() {
   const [recommendations, setRecommendations] = useState<any>(null);
   const [emotionData, setEmotionData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedEmotion, setSelectedEmotion] = useState<string>('');
 
-  // Load recommendations from localStorage (set by emotion detection)
+  // Build emotion query param for sub-page links
+  const emotionQuery = selectedEmotion ? `?emotion=${selectedEmotion}` : '';
+
+  // Load recommendations from localStorage (set by emotion detection) or API
   useEffect(() => {
-    const stored = localStorage.getItem('lastRecommendations');
-    if (stored) {
-      try {
-        const data = JSON.parse(stored);
-        console.log('Loaded recommendations data:', data);
-        console.log('Music data:', data.recommendations?.music);
-        
-        // Ensure recommendations is an object, not null
-        const recommendations = data.recommendations || {};
-        setRecommendations(recommendations);
-        setEmotionData({
-          dominant: data.emotion,
-          confidence: data.confidence,
-          lastUpdated: new Date(data.timestamp).toLocaleString()
-        });
-      } catch (e) {
-        console.error('Error parsing stored recommendations:', e);
-        // Set empty recommendations on error
+    const loadRecommendations = async () => {
+      const stored = localStorage.getItem('lastRecommendations');
+      if (stored) {
+        try {
+          const data = JSON.parse(stored);
+          const recommendations = data.recommendations || {};
+          setRecommendations(recommendations);
+          setEmotionData({
+            dominant: data.emotion,
+            confidence: data.confidence,
+            lastUpdated: new Date(data.timestamp).toLocaleString(),
+            source: 'detection',
+          });
+          setSelectedEmotion(data.emotion || '');
+        } catch (e) {
+          console.error('Error parsing stored recommendations:', e);
+          setRecommendations({});
+        }
+      } else {
         setRecommendations({});
       }
-    } else {
-      // No stored data, set empty recommendations
-      setRecommendations({});
-    }
-    setIsLoading(false);
+      setIsLoading(false);
+    };
+
+    loadRecommendations();
   }, []);
 
   // Transform microservice recommendations to display format
   const musicData = recommendations?.music;
-  console.log('Processing music data:', musicData);
-  console.log('Full recommendations object:', recommendations);
   
   let musicTracks: any[] = [];
   let playlistUrl: string | null = null;
   
   if (musicData) {
-    // Get playlist URL if available
-    playlistUrl = musicData.playlist_url || musicData.url || null;
+    playlistUrl = normalizeSpotifyLink(musicData.playlist_url || musicData.url || null);
     
-    // Extract tracks - handle different possible structures
     if (Array.isArray(musicData)) {
-      // If music is directly an array
       musicTracks = musicData;
     } else if (musicData.tracks) {
-      // If tracks property exists
       if (Array.isArray(musicData.tracks)) {
         musicTracks = musicData.tracks;
-        console.log('Found tracks array with', musicTracks.length, 'tracks');
       } else if (typeof musicData.tracks === 'object') {
-        // If tracks is an object, try to extract array from it
         musicTracks = Object.values(musicData.tracks).filter((item: any) => 
           item && (item.title || item.name || item.url)
         ) as any[];
-        console.log('Extracted tracks from object:', musicTracks.length);
       }
     }
-    
-    // Debug: Log what we found
-    if (musicTracks.length > 0) {
-      console.log('Sample track:', musicTracks[0]);
-    }
-    
-    // If no tracks but we have playlist URL, that's okay - we'll show playlist
-    // But log a warning
-    if (musicTracks.length === 0 && playlistUrl) {
-      console.warn('No individual tracks found, only playlist URL available');
-    }
-  } else {
-    console.warn('No music data in recommendations');
   }
   
-  console.log('Extracted music tracks:', musicTracks);
-  console.log('Playlist URL:', playlistUrl);
-  
-  // Build music recommendations - prioritize individual tracks
+  // Build music recommendations
   const musicRecs: any[] = [];
   
-  // Add individual tracks first (these are the actual songs)
   if (musicTracks.length > 0) {
     musicTracks.forEach((track: any, idx: number) => {
+      // Handle album as flat string or nested object from different API versions
+      const albumImage = typeof track.album === 'object' && track.album?.images?.[0]?.url
+        ? track.album.images[0].url
+        : null;
+      const coverImage = track.image_url || albumImage || track.images?.[0]?.url || null;
+
       musicRecs.push({
-        id: `track-${idx}`,
+        id: track.id || `track-${idx}`,
         title: track.title || track.name || 'Unknown Track',
-        artist: track.artist || track.artists?.[0]?.name || track.artists || 'Unknown Artist',
+        artist: track.artist || track.artists?.[0]?.name || 'Unknown Artist',
         duration: track.duration_ms ? `${Math.floor(track.duration_ms / 60000)}:${String(Math.floor((track.duration_ms % 60000) / 1000)).padStart(2, '0')}` : (track.duration || '0:00'),
         bpm: track.bpm || 0,
         benefit: 'Personalized for your mood',
         coverColor: 'bg-purple-500',
-        url: track.url || track.external_urls?.spotify || track.href || track.uri,
+        url: normalizeSpotifyLink(track.external_urls?.spotify || track.url || track.uri || track.href) || undefined,
         preview_url: track.preview_url || track.preview || null,
-        coverImage: track.album?.images?.[0]?.url || track.images?.[0]?.url || null
+        coverImage,
       });
     });
   }
   
-  // Only add playlist as a separate item if we have tracks AND a playlist URL
-  // Don't add it if we only have playlist URL (no tracks) - tracks should be shown instead
   if (playlistUrl && musicTracks.length > 0) {
-    // We have tracks, add playlist as an additional option at the end
     musicRecs.push({
       id: 'playlist',
       title: 'View Full Playlist on Spotify',
@@ -130,7 +135,6 @@ export default function PersonalizedRecommendationsPage() {
       isPlaylist: true
     });
   } else if (playlistUrl && musicTracks.length === 0) {
-    // Only playlist, no tracks - show as main item
     musicRecs.push({
       id: 'playlist',
       title: 'Personalized Playlist',
@@ -144,43 +148,73 @@ export default function PersonalizedRecommendationsPage() {
       isPlaylist: true
     });
   }
-  
-  console.log('Final music recommendations:', musicRecs);
-  console.log('Number of tracks:', musicRecs.length);
 
   const exerciseRecs = recommendations?.exercise?.map((ex: any, idx: number) => ({
     id: `e${idx + 1}`,
     name: ex.name || 'Exercise',
-    duration: '15 min', // Default duration
+    duration: ex.duration || '15 min',
     difficulty: ex.category || 'Beginner',
-    calories: 20, // Default calories
-    icon: '🏃',
+    calories: 20,
+    icon: ex.icon || '🏃',
     benefit: ex.description || 'Good for your mood'
   })) || [];
 
-  const quoteRecs = recommendations?.quote ? [{
-    id: 'q1',
-    text: recommendations.quote,
-    author: 'Inspirational'
-  }] : [];
+  const quoteRecs: any[] = [];
+  if (recommendations?.quote) {
+    if (typeof recommendations.quote === 'string') {
+      quoteRecs.push({ id: 'q1', text: recommendations.quote, author: 'Inspirational' });
+    } else if (Array.isArray(recommendations.quote)) {
+      recommendations.quote.forEach((q: any, idx: number) => {
+        quoteRecs.push({
+          id: `q${idx + 1}`,
+          text: typeof q === 'string' ? q : q.text || q.quote || '',
+          author: (typeof q === 'object' ? q.author : '') || 'Inspirational',
+        });
+      });
+    }
+  }
 
   const emotion = emotionData?.dominant || 'neutral';
 
   const toggleBookmark = (id: string, type: 'music' | 'quote') => {
+    const wasBookmarked = type === 'music' ? bookmarkedMusic.includes(id) : savedQuotes.includes(id);
+    
     if (type === 'music') {
       setBookmarkedMusic(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
     } else {
       setSavedQuotes(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
     }
+
+    const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (accessToken) {
+      apiSendRecommendationFeedback(accessToken, {
+        recommendation_id: id,
+        item_id: id,
+        feedback_type: wasBookmarked ? 'dislike' : 'like',
+        recommendation_type: type,
+      }).catch(() => {});
+    }
   };
 
   const toggleComplete = (id: string) => {
+    const wasCompleted = completedExercises.includes(id);
     setCompletedExercises(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+
+    const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (accessToken) {
+      apiSendRecommendationFeedback(accessToken, {
+        recommendation_id: id,
+        item_id: id,
+        feedback_type: wasCompleted ? 'skip' : 'complete',
+        recommendation_type: 'exercise',
+      }).catch(() => {});
+    }
   };
 
   const getEmotionColor = (emotion: string) => {
     const colors: Record<string, string> = {
       anxious: '#EC4899', sad: '#6366F1', happy: '#FCD34D', tired: '#6B7280', frustrated: '#EF4444',
+      calm: '#14B8A6', energetic: '#F97316', neutral: '#9CA3AF',
     };
     return colors[emotion] || '#9CA3AF';
   };
@@ -188,96 +222,108 @@ export default function PersonalizedRecommendationsPage() {
   const getEmotionEmoji = (emotion: string) => {
     const emojis: Record<string, string> = {
       anxious: '😰', sad: '😢', happy: '😊', tired: '😴', frustrated: '😤',
+      calm: '😌', energetic: '⚡', neutral: '😐',
     };
     return emojis[emotion] || '😐';
   };
 
   if (isLoading) {
     return (
-      <div className="space-y-3">
-        <div className="mb-4">
-          <h1 className="text-2xl font-bold mb-1">Emotional Support</h1>
-          <p className="text-sm text-neutral-600">Loading recommendations...</p>
-        </div>
+      <div className="flex flex-col items-center justify-center py-20 space-y-3">
+        <Loader2 className="w-8 h-8 animate-spin text-gray-300" />
+        <p className="text-sm text-gray-500">Loading recommendations...</p>
       </div>
     );
   }
 
-  if (!recommendations && !emotionData) {
+  const hasNoData = !recommendations || (
+    musicRecs.length === 0 && exerciseRecs.length === 0 && quoteRecs.length === 0
+  );
+
+  if (hasNoData && !emotionData) {
     return (
-      <div className="space-y-3">
-        <div className="mb-4">
-          <h1 className="text-2xl font-bold mb-1">Emotional Support</h1>
-          <p className="text-sm text-neutral-600">No recommendations available yet</p>
+      <div className="space-y-4">
+        <div className="bg-white border-b border-gray-200 -mx-4 sm:-mx-6 px-4 sm:px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-indigo-100 rounded-xl flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-indigo-600" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold leading-none">Emotional Support</h1>
+              <p className="text-xs text-gray-500 mt-0.5">Get personalized recommendations for your mood</p>
+            </div>
+          </div>
         </div>
-        <Card>
-          <CardContent className="p-6 text-center">
-            <Sparkles className="w-12 h-12 mx-auto mb-4 text-neutral-300" />
-            <p className="text-neutral-600 mb-4">Detect an emotion first to get personalized recommendations</p>
-            <a href="/check-in/new?type=video" className="text-indigo-600 hover:text-indigo-800 font-medium">
-              Go to Emotion Detection →
-            </a>
-          </CardContent>
-        </Card>
+        <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
+          <Sparkles className="w-12 h-12 mx-auto mb-4 text-gray-200" />
+          <p className="text-sm text-gray-600 mb-5">Detect an emotion to get personalized recommendations</p>
+          <a href="/check-in/new?type=video" className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
+            Or go to Emotion Detection →
+          </a>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* Page Header */}
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold mb-1">Emotional Support</h1>
-        <p className="text-sm text-neutral-600">Personalized recommendations based on your detected emotions</p>
+      <div className="bg-white border-b border-gray-200 -mx-4 sm:-mx-6 px-4 sm:px-6 py-4 flex items-center gap-3">
+        <div className="w-9 h-9 bg-indigo-100 rounded-xl flex items-center justify-center shrink-0">
+          <Sparkles className="w-5 h-5 text-indigo-600" />
+        </div>
+        <div className="min-w-0">
+          <h1 className="text-lg font-bold leading-none">Emotional Support</h1>
+          <p className="text-xs text-gray-500 mt-0.5">Personalized recommendations based on your detected emotions</p>
+        </div>
       </div>
 
-      {/* Emotion Status - Compact */}
-      {emotionData && (
-        <Card className="border-2" style={{ borderColor: getEmotionColor(emotion) }}>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="text-3xl">{getEmotionEmoji(emotion)}</div>
-                <div>
-                  <h2 className="text-lg font-bold capitalize" style={{ color: getEmotionColor(emotion) }}>
-                    {emotion}
-                  </h2>
-                  <div className="flex items-center gap-1.5 text-xs text-neutral-600">
-                    <Brain className="w-3 h-3" />
-                    {emotionData.confidence}% • {emotionData.lastUpdated || 'Just now'}
-                  </div>
-                </div>
+      {/* Emotion Status */}
+      <div className="bg-white rounded-2xl border-2 p-4" style={{ borderColor: getEmotionColor(emotion) }}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="text-4xl">{getEmotionEmoji(emotion)}</div>
+            <div>
+              <h2 className="text-lg font-bold capitalize" style={{ color: getEmotionColor(emotion) }}>
+                {emotion}
+              </h2>
+              <div className="flex items-center gap-1.5 text-xs text-neutral-500">
+                <Brain className="w-3 h-3" />
+                {emotionData?.confidence ? `${emotionData.confidence}% • ` : ''}
+                {emotionData?.lastUpdated || 'Just now'}
+                {emotionData?.source === 'api' && ' • via API'}
               </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </div>
+      </div>
 
       {/* Three Columns - Compact */}
       <div className="grid lg:grid-cols-3 gap-3">
-        {/* Music Player - Full Width on Large Screens */}
+        {/* Music Player */}
         <div className="lg:col-span-1">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <div className="w-6 h-6 bg-purple-100 rounded flex items-center justify-center">
-                  <Music className="w-3 h-3 text-purple-600" />
-                </div>
-                Music ({musicRecs.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-3">
+          <div className="bg-white rounded-2xl border border-gray-200">
+            <div className="flex items-center gap-2 px-4 pt-4 pb-2">
+              <div className="w-6 h-6 bg-purple-100 rounded-lg flex items-center justify-center">
+                <Music className="w-3 h-3 text-purple-600" />
+              </div>
+              <span className="text-sm font-semibold">Music ({musicRecs.length})</span>
+            </div>
+            <div className="p-3">
               {musicRecs.length === 0 ? (
                 <div className="text-center py-4 text-xs text-neutral-500">
                   <Music className="w-8 h-8 mx-auto mb-2 text-neutral-300" />
                   <p>No music recommendations available</p>
+                  <a href={`/music${emotionQuery}`} className="text-indigo-600 hover:underline mt-1 inline-block">
+                    Browse Music Library →
+                  </a>
                 </div>
               ) : (
                 <MusicPlayer
                   track={musicRecs[currentTrackIndex] || musicRecs[0]}
-                  playlist={musicRecs.filter((t: any) => !t.isPlaylist)} // Only show actual tracks, not playlist item
+                  playlist={musicRecs.filter((t: any) => !t.isPlaylist)}
+                  hideArtist={true}
                   onNext={() => {
-                    // Skip playlist item when navigating
                     let nextIndex = currentTrackIndex + 1;
                     while (nextIndex < musicRecs.length && musicRecs[nextIndex]?.isPlaylist) {
                       nextIndex++;
@@ -287,7 +333,6 @@ export default function PersonalizedRecommendationsPage() {
                     }
                   }}
                   onPrevious={() => {
-                    // Skip playlist item when navigating
                     let prevIndex = currentTrackIndex - 1;
                     while (prevIndex >= 0 && musicRecs[prevIndex]?.isPlaylist) {
                       prevIndex--;
@@ -304,89 +349,128 @@ export default function PersonalizedRecommendationsPage() {
                   }}
                 />
               )}
-            </CardContent>
-          </Card>
+              {playlistUrl && (
+                <a
+                  href={playlistUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-1.5 mt-2 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Open in Spotify
+                </a>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Exercise - Compact */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <div className="w-6 h-6 bg-orange-100 rounded flex items-center justify-center">
-                <Dumbbell className="w-3 h-3 text-orange-600" />
+        <div className="bg-white rounded-2xl border border-gray-200">
+          <div className="flex items-center gap-2 px-4 pt-4 pb-2">
+            <div className="w-6 h-6 bg-orange-100 rounded-lg flex items-center justify-center">
+              <Dumbbell className="w-3 h-3 text-orange-600" />
+            </div>
+            <span className="text-sm font-semibold">Exercises ({exerciseRecs.length})</span>
+          </div>
+          <div className="p-3 space-y-2">
+            {exerciseRecs.length === 0 ? (
+              <div className="text-center py-4 text-xs text-neutral-500">
+                <Dumbbell className="w-8 h-8 mx-auto mb-2 text-neutral-300" />
+                <p>No exercise recommendations available</p>
+                <a href={`/exercises${emotionQuery}`} className="text-indigo-600 hover:underline mt-1 inline-block">
+                  Browse Exercises →
+                </a>
               </div>
-              Exercises ({exerciseRecs.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 space-y-2">
-            {exerciseRecs.map((exercise: any) => (
-              <div key={exercise.id} className="border rounded-lg p-2">
-                <div className="flex items-start gap-2">
-                  <div className="text-2xl">{exercise.icon}</div>
-                  <div className="flex-1">
-                    <h4 className="font-medium text-xs">{exercise.name}</h4>
-                    <div className="flex flex-wrap items-center gap-1 mt-0.5">
-                      <Badge variant="secondary" className="text-xs px-1.5 py-0">{exercise.difficulty}</Badge>
-                      <span className="flex items-center gap-0.5 text-xs text-neutral-500">
-                        <Clock className="w-3 h-3" />
-                        {exercise.duration}
-                      </span>
-                      <span className="text-xs text-neutral-500">{exercise.calories} cal</span>
+            ) : (
+              exerciseRecs.map((exercise: any) => (
+                <div key={exercise.id} className="bg-gray-50 rounded-xl border border-gray-100 p-2">
+                  <div className="flex items-start gap-2">
+                    <div className="text-2xl">{exercise.icon}</div>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-xs">{exercise.name}</h4>
+                      <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                        <span className="inline-block text-xs px-1.5 py-0.5 bg-gray-200 rounded-md font-medium">{exercise.difficulty}</span>
+                        <span className="flex items-center gap-0.5 text-xs text-neutral-500">
+                          <Clock className="w-3 h-3" />
+                          {exercise.duration}
+                        </span>
+                        <span className="text-xs text-neutral-500">{exercise.calories} cal</span>
+                      </div>
+                      <p className="text-xs text-green-600 mt-1">✓ {exercise.benefit}</p>
                     </div>
-                    <p className="text-xs text-green-600 mt-1">✓ {exercise.benefit}</p>
+                  </div>
+                  <div className="flex gap-1 mt-2">
+                    <a href={`/exercises${emotionQuery}`} className="flex-1 flex items-center justify-center gap-1 h-7 text-xs font-medium bg-black text-white rounded-lg hover:bg-gray-800 transition-colors">
+                      <Play className="w-3 h-3" />
+                      Start
+                    </a>
+                    <button
+                      onClick={() => toggleComplete(exercise.id)}
+                      className={`h-7 px-2 text-xs rounded-lg border transition-colors ${completedExercises.includes(exercise.id) ? 'bg-green-50 text-green-600 border-green-200' : 'border-gray-200 hover:bg-gray-50'}`}
+                    >
+                      {completedExercises.includes(exercise.id) ? <Check className="w-3 h-3" /> : 'Done'}
+                    </button>
                   </div>
                 </div>
-                <div className="flex gap-1 mt-2">
-                  <Button size="sm" className="flex-1 h-7 text-xs">
-                    <Play className="w-3 h-3 mr-1" />
-                    Start
-                  </Button>
-                  <Button 
-                    onClick={() => toggleComplete(exercise.id)}
-                    size="sm"
-                    variant="outline"
-                    className={`h-7 px-2 text-xs ${completedExercises.includes(exercise.id) ? 'bg-green-50 text-green-600' : ''}`}
-                  >
-                    {completedExercises.includes(exercise.id) ? <Check className="w-3 h-3" /> : 'Done'}
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+              ))
+            )}
+          </div>
+        </div>
 
         {/* Quotes - Compact */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <div className="w-6 h-6 bg-pink-100 rounded flex items-center justify-center">
-                <Quote className="w-3 h-3 text-pink-600" />
+        <div className="bg-white rounded-2xl border border-gray-200">
+          <div className="flex items-center gap-2 px-4 pt-4 pb-2">
+            <div className="w-6 h-6 bg-pink-100 rounded-lg flex items-center justify-center">
+              <Quote className="w-3 h-3 text-pink-600" />
+            </div>
+            <span className="text-sm font-semibold">Quotes ({quoteRecs.length})</span>
+          </div>
+          <div className="p-3 space-y-2">
+            {quoteRecs.length === 0 ? (
+              <div className="text-center py-4 text-xs text-neutral-500">
+                <Quote className="w-8 h-8 mx-auto mb-2 text-neutral-300" />
+                <p>No quote recommendations available</p>
+                <a href={`/quotes${emotionQuery}`} className="text-indigo-600 hover:underline mt-1 inline-block">
+                  Browse Quotes →
+                </a>
               </div>
-              Quotes ({quoteRecs.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 space-y-2">
-            {quoteRecs.map((quote) => (
-              <div key={quote.id} className="border rounded-lg p-3">
-                <Quote className="w-5 h-5 text-neutral-300 mb-1.5" />
-                <p className="text-xs font-serif leading-relaxed text-neutral-800 mb-2">
-                  "{quote.text}"
-                </p>
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-neutral-600">— {quote.author}</p>
-                  <Button 
-                    onClick={() => toggleBookmark(quote.id, 'quote')}
-                    size="sm"
-                    variant="outline"
-                    className="h-6 w-6 p-0"
-                  >
-                    {savedQuotes.includes(quote.id) ? <Bookmark className="w-3 h-3 fill-current" /> : <BookmarkPlus className="w-3 h-3" />}
-                  </Button>
+            ) : (
+              quoteRecs.map((quote) => (
+                <div key={quote.id} className="bg-gray-50 rounded-xl border border-gray-100 p-3">
+                  <Quote className="w-4 h-4 text-gray-300 mb-1.5" />
+                  <p className="text-xs font-serif leading-relaxed text-neutral-800 mb-2">
+                    &ldquo;{quote.text}&rdquo;
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-neutral-500">— {quote.author}</p>
+                    <button
+                      onClick={() => toggleBookmark(quote.id, 'quote')}
+                      className="h-6 w-6 flex items-center justify-center rounded border border-gray-200 hover:bg-gray-100 transition-colors"
+                    >
+                      {savedQuotes.includes(quote.id) ? <Bookmark className="w-3 h-3 fill-current text-indigo-600" /> : <BookmarkPlus className="w-3 h-3 text-gray-500" />}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Links */}
+      <div className="grid grid-cols-3 gap-3">
+        <a href={`/music${emotionQuery}`} className="flex items-center justify-center gap-2 p-3 bg-white border border-gray-200 rounded-2xl hover:bg-gray-50 transition-colors text-sm font-medium">
+          <Music className="w-4 h-4 text-purple-600" />
+          Music Library
+        </a>
+        <a href={`/exercises${emotionQuery}`} className="flex items-center justify-center gap-2 p-3 bg-white border border-gray-200 rounded-2xl hover:bg-gray-50 transition-colors text-sm font-medium">
+          <Dumbbell className="w-4 h-4 text-orange-600" />
+          All Exercises
+        </a>
+        <a href={`/quotes${emotionQuery}`} className="flex items-center justify-center gap-2 p-3 bg-white border border-gray-200 rounded-2xl hover:bg-gray-50 transition-colors text-sm font-medium">
+          <Quote className="w-4 h-4 text-pink-600" />
+          Quote Library
+        </a>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { User, JournalEntry, Tag, MoodCheckIn, Recommendation, ChatMessage, EmotionAnalytics, JournalingStats } from '@/types'
+import { User, CheckInEntry, Tag, MoodCheckIn, Recommendation, ChatMessage, EmotionAnalytics, CheckInStats } from '@/types'
 import { EMOTIONS } from './emotions'
 
 // Current User
@@ -10,9 +10,9 @@ export const CURRENT_USER: User = {
   lastName: 'Jones',
   profilePicture: 'https://ui-avatars.com/api/?name=Sarah+Jones&background=6366F1&color=fff&size=200',
   dateOfBirth: '1995-06-15',
-  bio: 'Mental health advocate | Daily journaler | Finding peace one entry at a time 🌸',
+  bio: 'Mental health advocate | Daily assistanter | Finding peace one entry at a time 🌸',
   mentalHealthConcerns: ['anxiety', 'stress'],
-  journalingGoals: ['Manage anxiety', 'Track mood patterns', 'Build resilience'],
+  moodTrackingGoals: ['Manage anxiety', 'Track mood patterns', 'Build resilience'],
   totalEntries: 127,
   currentStreak: 7,
   longestStreak: 25,
@@ -33,8 +33,8 @@ export const DUMMY_TAGS: Tag[] = [
   { id: '10', name: 'meditation', color: '#A855F7', usageCount: 10 },
 ]
 
-// Journal Entries
-export const DUMMY_ENTRIES: JournalEntry[] = [
+// assistant Entries
+export const DUMMY_ENTRIES: CheckInEntry[] = [
   {
     id: '1',
     userId: '1',
@@ -83,7 +83,7 @@ export const DUMMY_ENTRIES: JournalEntry[] = [
     type: 'voice',
     title: 'Morning reflection',
     content: '',
-    transcription: 'Good morning journal. Just finished my morning meditation and I\'m feeling centered and ready for the day. The sun is shining, I had a good breakfast, and I\'m grateful for this peaceful moment before the day gets busy.',
+    transcription: 'Good morning assistant. Just finished my morning meditation and I\'m feeling centered and ready for the day. The sun is shining, I had a good breakfast, and I\'m grateful for this peaceful moment before the day gets busy.',
     wordCount: 0,
     duration: 45,
     privacy: 'private',
@@ -300,8 +300,8 @@ export const DUMMY_ANALYTICS: EmotionAnalytics = {
   averageMood: 0.6,
 }
 
-// Journaling Stats
-export const DUMMY_STATS: JournalingStats = {
+// Check-In Stats
+export const DUMMY_STATS: CheckInStats = {
   totalEntries: 127,
   currentStreak: 7,
   longestStreak: 25,

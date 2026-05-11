@@ -18,7 +18,7 @@ export const ML_MODELS: MLModel[] = [
     version: 'v1.8.3',
     type: 'voice',
     status: 'active',
-    accuracy: 0.892,
+    accuracy: 0.914,
     lastTrained: '2025-10-03T14:20:00Z',
     totalPredictions: 8923
   },
@@ -28,7 +28,7 @@ export const ML_MODELS: MLModel[] = [
     version: 'v3.0.1',
     type: 'video',
     status: 'active',
-    accuracy: 0.934,
+    accuracy: 0.782,
     lastTrained: '2025-10-08T09:15:00Z',
     totalPredictions: 12456
   },
@@ -78,35 +78,35 @@ export const TEXT_MODEL_PERFORMANCE: ModelPerformance = {
 }
 
 export const VOICE_MODEL_PERFORMANCE: ModelPerformance = {
-  accuracy: 0.892,
-  precision: 0.898,
-  recall: 0.886,
-  f1Score: 0.892,
+  accuracy: 0.914,
+  precision: 0.918,
+  recall: 0.910,
+  f1Score: 0.914,
   classLabels: ['happy', 'sad', 'angry', 'anxious', 'neutral', 'calm'],
   confusionMatrix: [
-    [189, 5, 2, 3, 8, 3], // happy
-    [4, 172, 6, 10, 5, 3], // sad
-    [3, 7, 165, 8, 4, 3], // angry
-    [5, 14, 6, 158, 6, 1], // anxious
-    [7, 4, 3, 5, 195, 6], // neutral
-    [3, 2, 1, 2, 8, 184]  // calm
+    [195, 3, 2, 2, 6, 2], // happy
+    [3, 182, 4, 7, 3, 1], // sad
+    [2, 5, 178, 5, 3, 2], // angry
+    [3, 9, 4, 172, 4, 1], // anxious
+    [5, 3, 2, 3, 201, 4], // neutral
+    [2, 1, 1, 1, 5, 190]  // calm
   ]
 }
 
 export const VIDEO_MODEL_PERFORMANCE: ModelPerformance = {
-  accuracy: 0.934,
-  precision: 0.938,
-  recall: 0.930,
-  f1Score: 0.934,
+  accuracy: 0.782,
+  precision: 0.790,
+  recall: 0.774,
+  f1Score: 0.782,
   classLabels: ['happy', 'sad', 'angry', 'surprised', 'neutral', 'disgusted', 'fearful'],
   confusionMatrix: [
-    [223, 4, 2, 5, 6, 1, 2], // happy
-    [3, 201, 5, 2, 7, 1, 3], // sad
-    [2, 6, 188, 1, 4, 2, 0], // angry
-    [7, 1, 0, 196, 8, 2, 1], // surprised
-    [5, 6, 3, 7, 218, 3, 1], // neutral
-    [1, 2, 4, 1, 5, 178, 2], // disgusted
-    [2, 4, 1, 2, 3, 1, 187] // fearful
+    [185, 12, 8, 10, 15, 5, 8], // happy
+    [10, 172, 10, 8, 14, 4, 5], // sad
+    [8, 12, 160, 6, 10, 8, 3], // angry
+    [14, 6, 5, 168, 18, 6, 4], // surprised
+    [12, 10, 8, 12, 190, 8, 5], // neutral
+    [6, 8, 10, 5, 12, 152, 6], // disgusted
+    [8, 6, 4, 8, 10, 5, 162] // fearful
   ]
 }
 
@@ -136,7 +136,7 @@ export const TRAINING_HISTORY = {
   ]
 }
 
-// Emotion Detection Results (for journal entries)
+// Emotion Detection Results (for assistant entries)
 export const EMOTION_DETECTIONS = [
   {
     id: '1',

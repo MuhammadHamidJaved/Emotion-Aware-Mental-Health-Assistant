@@ -16,7 +16,7 @@ export default function EditProfilePage() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [preferredTime, setPreferredTime] = useState('');
   const [mentalConcerns, setMentalConcerns] = useState('');
-  const [journalingGoals, setJournalingGoals] = useState('');
+  const [moodTrackingGoals, setMoodTrackingGoals] = useState('');
   const [enableBiometric, setEnableBiometric] = useState(false);
   const [enableNotifications, setEnableNotifications] = useState(true);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -35,7 +35,7 @@ export default function EditProfilePage() {
     setPreviewUrl(user.profile_picture || null);
     setDateOfBirth(user.date_of_birth || '');
     setPhoneNumber(user.phone_number || '');
-    setPreferredTime(user.preferred_journal_time || '');
+    setPreferredTime(user.preferred_checkin_time || '');
     setEnableBiometric(!!user.enable_biometric);
     setEnableNotifications(
       typeof user.enable_notifications === 'boolean' ? user.enable_notifications : true,
@@ -43,8 +43,8 @@ export default function EditProfilePage() {
     if (user.mental_health_concerns && user.mental_health_concerns.length > 0) {
       setMentalConcerns(user.mental_health_concerns.join(', '));
     }
-    if (user.journaling_goals && user.journaling_goals.length > 0) {
-      setJournalingGoals(user.journaling_goals.join(', '));
+    if (user.mood_tracking_goals && user.mood_tracking_goals.length > 0) {
+      setMoodTrackingGoals(user.mood_tracking_goals.join(', '));
     }
   }, [user]);
 
@@ -67,13 +67,13 @@ export default function EditProfilePage() {
         formData.append('phone_number', phoneNumber);
       }
       if (preferredTime) {
-        formData.append('preferred_journal_time', preferredTime);
+        formData.append('preferred_checkin_time', preferredTime);
       }
       if (mentalConcerns) {
         formData.append('mental_health_concerns', mentalConcerns);
       }
-      if (journalingGoals) {
-        formData.append('journaling_goals', journalingGoals);
+      if (moodTrackingGoals) {
+        formData.append('mood_tracking_goals', moodTrackingGoals);
       }
       formData.append('enable_biometric', String(enableBiometric));
       formData.append('enable_notifications', String(enableNotifications));
@@ -255,8 +255,8 @@ export default function EditProfilePage() {
                   Separate with commas, e.g. daily reflection, gratitude.
                 </p>
                 <textarea
-                  value={journalingGoals}
-                  onChange={(e) => setJournalingGoals(e.target.value)}
+                  value={moodTrackingGoals}
+                  onChange={(e) => setMoodTrackingGoals(e.target.value)}
                   rows={2}
                   disabled={isLoading}
                   className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none transition-all"
