@@ -11,14 +11,10 @@ cloudinary==1.41.0
 cryptography==42.0.5
 requests==2.31.0
 pywebpush==1.14.1
-# RAG Chat Bot dependencies
-# Core langchain packages - install in this order
-# Resolved dependency conflict: langchain 0.3.7 needs langsmith<0.2.0
-# but langchain-core 0.3.78+ needs langsmith>=0.3.45
-# Solution: Use compatible versions - downgrade langchain-core to work with langchain 0.3.7
-langchain-core==0.2.38
+# RAG / LangChain — pins must agree: langchain 0.3.7 needs langchain-core>=0.3.15 and langsmith<0.2;
+# langchain-pinecone 0.2.13 needs langchain-core>=0.3.34; langchain-core 0.3.64+ forces langsmith>=0.3.45 (breaks langchain 0.3.7).
+langchain-core==0.3.63
 langchain==0.3.7
-# Note: langchain-pinecone 0.2.13 may need newer langchain-core, adjust if needed
 langchain-pinecone==0.2.13
 langchain-google-genai==2.0.11
 langchain-huggingface==0.3.1
