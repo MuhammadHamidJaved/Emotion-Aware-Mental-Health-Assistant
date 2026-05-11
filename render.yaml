@@ -1,0 +1,53 @@
+services:
+  - type: web
+    name: emotion-assistant-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate
+    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: DEBUG
+        value: "False"
+      # Set the values below in the Render dashboard — do NOT commit real secrets here.
+      - key: SECRET_KEY
+        sync: false
+      - key: NEON_DATABASE_URL
+        sync: false
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS_EXTRA
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      # Cloudinary
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      # SendGrid
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: SENDGRID_FROM_EMAIL
+        sync: false
+      # Web Push (VAPID)
+      - key: WEB_PUSH_PUBLIC_KEY
+        sync: false
+      - key: WEB_PUSH_PRIVATE_KEY
+        sync: false
+      - key: WEB_PUSH_ADMIN_CONTACT
+        sync: false
+      # Microservices — set to real hosted URLs in production
+      - key: EMOTION_MICROSERVICE_URL
+        sync: false
+      - key: EMOTION_7CLASS_MICROSERVICE_URL
+        sync: false
+      - key: RECOMMENDATION_MICROSERVICE_URL
+        sync: false
+      - key: TEXT_EMOTION_MICROSERVICE_URL
+        sync: false
+      - key: VOICE_EMOTION_MICROSERVICE_URL
+        sync: false
