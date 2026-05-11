@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Quote, Heart, Share2, Shuffle, Sparkles, TrendingUp, Loader2 } from 'lucide-react';
 import { apiGetPersonalizedRecommendations, apiSendRecommendationFeedback, apiGetRecommendationSettings, type RecommendationSettings } from '@/lib/api';
@@ -97,7 +97,7 @@ const getCategoryForEmotion = (emotion: string): string => {
   }
 };
 
-export default function QuotesPage() {
+function QuotesPageContent() {
   const searchParams = useSearchParams();
   const urlEmotion = searchParams?.get('emotion') || null;
 
@@ -506,5 +506,19 @@ export default function QuotesPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function QuotesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-violet-600" aria-label="Loading" />
+        </div>
+      }
+    >
+      <QuotesPageContent />
+    </Suspense>
   );
 }

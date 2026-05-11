@@ -3,6 +3,9 @@
 import logging
 from datetime import datetime
 
+from recommendations.notification_dispatcher import NotificationDispatcher
+from recommendations.notification_service import NotificationService
+
 from assistant.services.microservice_clients import (
     call_recommendation_microservice,
     get_user_recommendation_preferences,
@@ -40,7 +43,7 @@ class RecommendationSideEffectsService:
                 preferences=user_preferences,
             )
 
-            if recommendations_data and notification_service:
+            if recommendations_data:
                 try:
                     if recommendation_storage_service:
                         user_recommendation = recommendation_storage_service.store_recommendations_from_microservice(
@@ -51,11 +54,19 @@ class RecommendationSideEffectsService:
                         if user_recommendation:
                             logger.info(f"Stored recommendation for user {user.id}")
 
-                    if notification_service.should_send_notification(user, 'recommendation'):
-                        notification_service.create_recommendation_notification(
+                    if NotificationService.should_send_notification(user, 'recommendation'):
+                        title = 'New personalized recommendation'
+                        msg = (
+                            f'Based on your recent emotions, we recommend: '
+                            f'Recommendations for {predicted_emotion} mood'
+                        )
+                        NotificationDispatcher.dispatch(
                             user=user,
-                            recommendation_title=f"Recommendations for {predicted_emotion} mood",
-                            recommendation_id=None
+                            notification_type='recommendation',
+                            title=title,
+                            message=msg,
+                            action_url='/recommendations',
+                            metadata={'emotion': predicted_emotion},
                         )
                 except Exception as exc:
                     logger.error(f"Error creating recommendation notification: {exc}")

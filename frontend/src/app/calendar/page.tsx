@@ -295,7 +295,7 @@ export default function CalendarPage() {
 
           {/* Selected Day Details */}
           <div>
-            <div className="border border-gray-200 rounded-lg p-6 sticky top-6">
+            <div className="border border-gray-200 rounded-lg p-6">
               {selectedDay ? (
                 <>
                   <div className="flex items-center gap-2 mb-4">

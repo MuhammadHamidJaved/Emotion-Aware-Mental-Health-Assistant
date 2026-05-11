@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { User as UserIcon, Bell, Lock, Palette, Sparkles, Download, Trash2, Save, Camera, Loader2, X, Plus, Settings } from 'lucide-react';
+import { User as UserIcon, Bell, Lock, Palette, Sparkles, Download, Trash2, Save, Camera, Loader2, X, Plus, Settings, CloudUpload } from 'lucide-react';
 import ProtectedPage from '@/components/ProtectedPage';
 import PageHeading from '@/components/PageHeading';
+import { useAuth } from '@/contexts/auth-context';
 import {
   apiGetProfileSettings,
   apiUpdateProfileSettings,
@@ -18,6 +19,7 @@ import {
   apiGetRecommendationOptions,
   apiExportData,
   apiDeleteAccount,
+  apiCreateCheckInEntry,
   type ProfileSettings,
   type NotificationSettings,
   type PrivacySettings,
@@ -25,6 +27,8 @@ import {
   type RecommendationSettings,
   type RecommendationOptions,
 } from '@/lib/api';
+import { syncPendingLocalToCloud } from '@/lib/local-check-in-store';
+import { syncWebPushSubscription } from '@/lib/web-push';
 
 const cloneRecommendationSettings = (value: RecommendationSettings): RecommendationSettings => ({
   ...value,
@@ -33,6 +37,8 @@ const cloneRecommendationSettings = (value: RecommendationSettings): Recommendat
 });
 
 export default function SettingsPage() {
+  const { logout, user, getAccessToken } = useAuth();
+  const [syncingLocalCheckIns, setSyncingLocalCheckIns] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -249,7 +255,20 @@ export default function SettingsPage() {
       } else if (activeTab === 'notifications') {
         await apiUpdateNotificationSettings(accessToken, notifications);
         setInitialNotifications({ ...notifications });
-        alert('Notification settings updated successfully.');
+        let pushNote = '';
+        try {
+          await syncWebPushSubscription(accessToken, notifications.push_notifications);
+        } catch (pushErr) {
+          console.error(pushErr);
+          pushNote =
+            pushErr instanceof Error ? pushErr.message : 'Push subscription could not be updated.';
+          setError(pushNote);
+        }
+        alert(
+          pushNote
+            ? `Notification settings saved. Push: ${pushNote}`
+            : 'Notification settings updated successfully.'
+        );
       } else if (activeTab === 'privacy') {
         await apiUpdatePrivacySettings(accessToken, privacy);
         setInitialPrivacy({ ...privacy });
@@ -300,14 +319,41 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSyncDeviceCheckInsToCloud = async () => {
+    const accessToken = getAccessToken();
+    if (!accessToken || !user?.id) {
+      alert('You must be signed in to sync.');
+      return;
+    }
+    setSyncingLocalCheckIns(true);
+    try {
+      const result = await syncPendingLocalToCloud(user.id, (payload) =>
+        apiCreateCheckInEntry(accessToken, payload as Record<string, unknown>).then((e) => ({ id: e.id }))
+      );
+      const detail =
+        result.uploaded === 0 && result.failed === 0
+          ? 'No device-only check-ins were waiting to upload.'
+          : `Uploaded ${result.uploaded} check-in(s) to the cloud.${result.failed ? ` ${result.failed} could not be uploaded.` : ''}`;
+      if (result.errors.length) {
+        alert(`${detail}\n${result.errors.slice(0, 3).join('\n')}`);
+      } else {
+        alert(detail);
+      }
+    } catch (error: unknown) {
+      alert(error instanceof Error ? error.message : 'Sync failed.');
+    } finally {
+      setSyncingLocalCheckIns(false);
+    }
+  };
+
   const handleExportData = async () => {
     try {
       const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
       if (!accessToken) {
         throw new Error('Not authenticated');
       }
-      const result = await apiExportData(accessToken);
-      alert(result.message);
+      await apiExportData(accessToken);
+      alert('Your data export has been downloaded as a JSON file.');
     } catch (error: unknown) {
       alert(error instanceof Error ? error.message : 'Failed to request data export.');
     }
@@ -322,8 +368,9 @@ export default function SettingsPage() {
       if (!accessToken) {
         throw new Error('Not authenticated');
       }
-      const result = await apiDeleteAccount(accessToken);
-      alert(result.message);
+      await apiDeleteAccount(accessToken);
+      alert('Your account has been permanently deleted.');
+      logout();
     } catch (error: unknown) {
       alert(error instanceof Error ? error.message : 'Failed to request account deletion.');
     }
@@ -686,9 +733,9 @@ export default function SettingsPage() {
                           <div>
                             <div className="font-medium capitalize">{type}</div>
                             <div className="text-sm text-gray-600">
-                              {type === 'cloud' && 'Store all data in the cloud'}
-                              {type === 'local' && 'Store all data locally on your device'}
-                              {type === 'hybrid' && 'Recommended: Use both cloud and local storage'}
+                              {type === 'cloud' && 'Save check-ins to your account on the server'}
+                              {type === 'local' && 'Save check-ins only in this browser; use “Sync device check-ins to cloud” when you want them on the server'}
+                              {type === 'hybrid' && 'Save to the server and keep a backup copy on this device'}
                             </div>
                           </div>
                         </label>
@@ -700,6 +747,27 @@ export default function SettingsPage() {
                   <div className="border-t border-neutral-200 pt-5 sm:pt-6">
                     <h3 className="text-sm font-semibold text-gray-900 mb-3">Data management</h3>
                     <div className="space-y-2 sm:space-y-3">
+                      <button
+                        type="button"
+                        disabled={syncingLocalCheckIns}
+                        onClick={handleSyncDeviceCheckInsToCloud}
+                        className="w-full flex items-center justify-between gap-3 px-3 sm:px-4 py-3 border border-neutral-200 rounded-xl hover:bg-neutral-50 transition-colors text-left touch-manipulation disabled:opacity-60"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          {syncingLocalCheckIns ? (
+                            <Loader2 className="w-5 h-5 text-gray-600 shrink-0 animate-spin" />
+                          ) : (
+                            <CloudUpload className="w-5 h-5 text-gray-600 shrink-0" />
+                          )}
+                          <div className="text-left min-w-0">
+                            <div className="font-medium">Sync device check-ins to cloud</div>
+                            <div className="text-sm text-gray-600">
+                              Upload entries that were saved only on this device (e.g. after choosing local storage) to your server account.
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+
                       <button
                         type="button"
                         onClick={handleExportData}

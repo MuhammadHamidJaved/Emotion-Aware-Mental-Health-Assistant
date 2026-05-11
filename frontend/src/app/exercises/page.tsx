@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Dumbbell, Play, Check, Clock, Target, TrendingUp, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 import { apiGetPersonalizedRecommendations, apiSendRecommendationFeedback, apiGetRecommendationSettings, type ExerciseRecommendation, type RecommendationSettings } from '@/lib/api';
@@ -145,7 +145,7 @@ function apiExerciseToExercise(ex: ExerciseRecommendation, idx: number): Exercis
   };
 }
 
-export default function ExercisesPage() {
+function ExercisesPageContent() {
   const searchParams = useSearchParams();
   const urlEmotion = searchParams?.get('emotion') || null;
 
@@ -512,5 +512,19 @@ export default function ExercisesPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ExercisesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-sky-600" aria-label="Loading" />
+        </div>
+      }
+    >
+      <ExercisesPageContent />
+    </Suspense>
   );
 }

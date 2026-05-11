@@ -5,13 +5,14 @@ from typing import Any, Dict, Optional
 
 import requests
 from django.conf import settings
+from requests import HTTPError
 from common.external_service_utils import log_external_failure, map_external_exception
 
 logger = logging.getLogger(__name__)
 
 EMOTION_MICROSERVICE_URL = getattr(settings, 'EMOTION_MICROSERVICE_URL', 'http://localhost:8001')
 EMOTION_7CLASS_MICROSERVICE_URL = getattr(settings, 'EMOTION_7CLASS_MICROSERVICE_URL', 'http://localhost:5002')
-RECOMMENDATION_MICROSERVICE_URL = getattr(settings, 'RECOMMENDATION_MICROSERVICE_URL', 'http://localhost:5001/api')
+RECOMMENDATION_MICROSERVICE_URL = getattr(settings, 'RECOMMENDATION_MICROSERVICE_URL', 'http://localhost:5000/api')
 TEXT_EMOTION_MICROSERVICE_URL = getattr(settings, 'TEXT_EMOTION_MICROSERVICE_URL', 'http://localhost:5001')
 VOICE_EMOTION_MICROSERVICE_URL = getattr(settings, 'VOICE_EMOTION_MICROSERVICE_URL', 'http://127.0.0.1:5003')
 
@@ -232,10 +233,31 @@ def call_voice_emotion_microservice(uploaded_file) -> Optional[Dict[str, Any]]:
         raw_name = getattr(uploaded_file, 'name', None) or 'recording.webm'
         content_type = getattr(uploaded_file, 'content_type', None) or 'application/octet-stream'
         payload = uploaded_file.read()
-        files = {'file': (raw_name, payload, content_type)}
-
-        response = requests.post(url, files=files, timeout=120)
-        response.raise_for_status()
+        # Different FastAPI voice services use different multipart field names.
+        # Try the canonical "file" first, then common alternates on 422.
+        field_names = ('file', 'audio_file', 'audio', 'voice')
+        response = None
+        last_http_error: Optional[HTTPError] = None
+        for idx, field_name in enumerate(field_names):
+            files = {field_name: (raw_name, payload, content_type)}
+            resp = requests.post(url, files=files, timeout=120)
+            try:
+                resp.raise_for_status()
+                response = resp
+                if idx > 0:
+                    logger.info("Voice microservice accepted multipart field '%s'", field_name)
+                break
+            except HTTPError as exc:
+                last_http_error = exc
+                if resp.status_code == 422 and idx < len(field_names) - 1:
+                    logger.warning(
+                        "Voice microservice rejected field '%s' with 422, retrying alternate field name...",
+                        field_name,
+                    )
+                    continue
+                raise
+        if response is None and last_http_error:
+            raise last_http_error
 
         data = response.json()
         predictions = data.get('predictions') or []
@@ -271,6 +293,13 @@ def call_voice_emotion_microservice(uploaded_file) -> Optional[Dict[str, Any]]:
         }
 
     except Exception as exc:
+        if isinstance(exc, HTTPError) and getattr(exc, 'response', None) is not None:
+            # Surface FastAPI validation details (422) for quicker integration fixes.
+            try:
+                details = exc.response.json()
+            except Exception:  # pragma: no cover - defensive logging only
+                details = exc.response.text
+            logger.error("Voice microservice HTTP %s response: %s", exc.response.status_code, details)
         error_info = map_external_exception(
             exc,
             service_name='voice-emotion-microservice',

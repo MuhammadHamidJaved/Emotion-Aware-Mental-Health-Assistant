@@ -16,7 +16,7 @@ from .response_helpers import error_response, ok_response
 logger = logging.getLogger(__name__)
 
 RECOMMENDATION_MICROSERVICE_URL = getattr(
-    django_settings, 'RECOMMENDATION_MICROSERVICE_URL', 'http://localhost:5001/api'
+    django_settings, 'RECOMMENDATION_MICROSERVICE_URL', 'http://localhost:5000/api'
 )
 
 # ── helpers ────────────────────────────────────────────────────────────
@@ -140,7 +140,7 @@ def get_recommendations(request):
             service_name='recommendation-microservice',
             operation='recommend',
             timeout_message='Recommendation service timed out. Please try again.',
-            connection_message='Recommendation service is not available. Make sure it is running on port 5001.',
+            connection_message='Recommendation service is not available. Make sure it is running on port 5000.',
             request_message='Recommendation service error. Please try again.',
             unexpected_message='Recommendation service error. Please try again.',
         )

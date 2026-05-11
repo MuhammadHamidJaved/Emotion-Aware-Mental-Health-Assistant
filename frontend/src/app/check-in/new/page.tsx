@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { Suspense, useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Brain, Save, Loader2, Zap, Type, Mic, Video, Sparkles, AlertCircle, Clock, PenLine } from 'lucide-react'
 import { useAuth } from '@/contexts/auth-context'
-import { API_URL } from '@/lib/api'
+import { API_URL, apiCreateCheckInEntry, apiGetPrivacySettings } from '@/lib/api'
+import { addLocalCheckIn, addSyncedMirror } from '@/lib/local-check-in-store'
 import PageHeading from '@/components/PageHeading'
 
 const EMOTION_COLORS: Record<string, string> = {
@@ -15,10 +16,10 @@ const EMOTION_COLORS: Record<string, string> = {
   surprised: '#FBBF24', energetic: '#F59E0B', fearful: '#DC2626', disgusted: '#84CC16', disappointed: '#6366F1'
 }
 
-export default function NewCheckInPage() {
+function NewCheckInPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { getAccessToken } = useAuth()
+  const { getAccessToken, user } = useAuth()
   const entryType = searchParams.get('type') || 'text'
 
   const [title, setTitle] = useState('')
@@ -137,10 +138,16 @@ export default function NewCheckInPage() {
 
       const data = await response.json()
 
-      if (data.success) {
+      // Match video flow: accept explicit success OR a usable prediction payload (API should send both).
+      const ok =
+        data.success === true ||
+        data.success === 'true' ||
+        Boolean(data.predicted_emotion)
+
+      if (ok && data.predicted_emotion) {
         // Map microservice emotion to our emotion format
-        const predictedEmotion = data.predicted_emotion.toLowerCase()
-        const confidence = (data.confidence * 100).toFixed(1)
+        const predictedEmotion = String(data.predicted_emotion).toLowerCase()
+        const confidence = (Number(data.confidence ?? 0) * 100).toFixed(1)
 
         // Convert all_scores to predictions array
         const predictions = Object.entries(data.all_scores || {}).map(([emotion, score]: [string, any]) => ({
@@ -248,32 +255,28 @@ export default function NewCheckInPage() {
         entryData.emotion_confidence = parseFloat(emotionData.confidence) / 100
       }
 
-      // Get access token from auth context
       const token = getAccessToken()
       if (!token) {
         throw new Error('Authentication required. Please log in again.')
       }
-
-      // Save to backend
-      const response = await fetch(`${API_URL}/api/assistant/entries/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(entryData)
-      })
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Authentication required. Please log in again.')
-        }
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || errorData.message || errorData.detail || 'Failed to save entry')
+      if (!user?.id) {
+        throw new Error('Could not resolve your account. Please refresh and try again.')
       }
 
-      const savedEntry = await response.json()
-      console.log('Entry saved:', savedEntry)
+      const privacy = await apiGetPrivacySettings(token)
+      const storageType = privacy.storage_type
+
+      if (storageType === 'local') {
+        const localId = await addLocalCheckIn(user.id, entryData as Record<string, unknown>)
+        console.log('Entry saved on device:', localId)
+      } else if (storageType === 'cloud') {
+        const savedEntry = await apiCreateCheckInEntry(token, entryData)
+        console.log('Entry saved:', savedEntry)
+      } else {
+        const savedEntry = await apiCreateCheckInEntry(token, entryData)
+        await addSyncedMirror(user.id, savedEntry.id, entryData as Record<string, unknown>)
+        console.log('Entry saved (cloud + local backup):', savedEntry)
+      }
 
       // Show recommendations modal
       setShowRecommendations(true)
@@ -556,7 +559,10 @@ export default function NewCheckInPage() {
     setIsRecording(false)
   }
 
-  const detectEmotionFromVoiceBlob = async (blob: Blob) => {
+  const detectEmotionFromVoiceBlob = async (
+    blob: Blob,
+    opts?: { appendHistory?: boolean; storeRecommendations?: boolean; setAsFinal?: boolean }
+  ) => {
     setIsAnalyzing(true)
     setVoiceError(null)
     try {
@@ -602,9 +608,22 @@ export default function NewCheckInPage() {
         }
 
         setLiveEmotion(emotionData)
-        setFinalEmotion(emotionData)
+        if (opts?.setAsFinal) setFinalEmotion(emotionData)
 
-        if (data.recommendations) {
+        if (opts?.appendHistory) {
+          setEmotionHistory(prev => [
+            ...prev,
+            {
+              emotion: predictedEmotion,
+              confidence,
+              predictions: predictions.slice(0, 5),
+              timestamp: Date.now(),
+              processingTime: data.processing_time_ms || 0
+            }
+          ])
+        }
+
+        if (opts?.storeRecommendations && data.recommendations) {
           setRecommendations(data.recommendations)
           localStorage.setItem('lastRecommendations', JSON.stringify({
             emotion: predictedEmotion,
@@ -647,6 +666,7 @@ export default function NewCheckInPage() {
       setRecommendations(null)
       setRecordingDuration(0)
       recordingStartRef.current = Date.now()
+      setEmotionHistory([])
       setIsRecording(true)
       durationIntervalRef.current = setInterval(() => {
         setRecordingDuration(prev => prev + 1)
@@ -687,7 +707,12 @@ export default function NewCheckInPage() {
       return
     }
 
-    await detectEmotionFromVoiceBlob(blob)
+    // Final (full-clip) prediction; store recommendations and set finalEmotion.
+    await detectEmotionFromVoiceBlob(blob, {
+      appendHistory: true,
+      storeRecommendations: true,
+      setAsFinal: true
+    })
   }
 
   // Toggle prediction (pause/resume) without stopping recording
@@ -772,7 +797,7 @@ export default function NewCheckInPage() {
     entryType === 'text'
       ? 'Share how you feel — AI detects emotions as you write'
       : entryType === 'voice'
-        ? 'Speak naturally — we analyze tone and mood'
+        ? 'Speak naturally — we analyze tone and mood after you finish'
         : 'Video log — AI reads your facial expressions in real time'
 
   return (
@@ -1095,7 +1120,9 @@ export default function NewCheckInPage() {
                     </div>
                     <div>
                       <h3 className="font-bold text-indigo-900">AI Emotion Detection</h3>
-                      <p className="text-xs text-indigo-700">Real-time ML analysis</p>
+                      <p className="text-xs text-indigo-700">
+                        {entryType === 'voice' ? 'Post-recording ML analysis' : 'Real-time ML analysis'}
+                      </p>
                     </div>
                   </div>
 
@@ -1270,7 +1297,11 @@ export default function NewCheckInPage() {
                     <AlertCircle className="w-5 h-5 text-neutral-500 flex-shrink-0 mt-0.5" />
                     <div className="text-xs text-neutral-600 leading-relaxed">
                       <p className="font-medium text-neutral-700 mb-1">How it works</p>
-                      <p>Our AI analyzes your {entryType === 'text' ? 'words' : entryType === 'voice' ? 'voice tone' : 'facial expressions'} in real-time to detect emotions. This helps generate personalized wellness recommendations.</p>
+                      <p>
+                        {entryType === 'voice'
+                          ? 'Our AI analyzes your voice tone after you stop recording to detect emotions. This helps generate personalized wellness recommendations.'
+                          : `Our AI analyzes your ${entryType === 'text' ? 'words' : 'facial expressions'} in real-time to detect emotions. This helps generate personalized wellness recommendations.`}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1330,3 +1361,16 @@ export default function NewCheckInPage() {
   )
 }
 
+export default function NewCheckInPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" aria-label="Loading" />
+        </div>
+      }
+    >
+      <NewCheckInPageContent />
+    </Suspense>
+  )
+}

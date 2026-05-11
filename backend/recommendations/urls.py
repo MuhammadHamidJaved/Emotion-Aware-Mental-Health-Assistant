@@ -25,6 +25,9 @@ urlpatterns = [
     path('notifications/clear/', notification_views.clear_all_notifications, name='notifications-clear'),
     path('notifications/<int:notification_id>/', notification_views.delete_notification, name='notifications-delete'),
     path('notifications/test/', notification_views.test_notification, name='notifications-test'),
+    path('notifications/push/vapid-key/', notification_views.push_vapid_public_key, name='notifications-push-vapid'),
+    path('notifications/push/subscribe/', notification_views.push_subscribe, name='notifications-push-subscribe'),
+    path('notifications/push/unsubscribe/', notification_views.push_unsubscribe, name='notifications-push-unsubscribe'),
 ]
 
 

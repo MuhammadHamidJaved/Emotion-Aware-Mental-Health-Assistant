@@ -383,6 +383,51 @@ export async function apiGetCheckInEntries(
   }
 }
 
+export async function apiGetCheckInEntry(accessToken: string, entryId: number): Promise<CheckInEntry> {
+  const res = await fetch(`${API_URL}/api/assistant/entries/${entryId}/`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || err.message || err.detail || 'Failed to load entry.');
+  }
+  return res.json();
+}
+
+export async function apiCreateCheckInEntry(
+  accessToken: string,
+  body: Record<string, unknown>
+): Promise<CheckInEntry> {
+  const res = await fetch(`${API_URL}/api/assistant/entries/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || err.message || err.detail || err.text_content?.[0] || 'Failed to save entry.');
+  }
+  return res.json();
+}
+
+export async function apiDeleteCheckInEntry(accessToken: string, entryId: number): Promise<void> {
+  const res = await fetch(`${API_URL}/api/assistant/entries/${entryId}/`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  if (!res.ok && res.status !== 404) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || err.message || 'Failed to delete entry.');
+  }
+}
+
 // Insights API types
 export type InsightsOverview = {
   overall_mood: number;
@@ -769,7 +814,8 @@ export async function apiGetRecommendationOptions(accessToken: string): Promise<
   return res.json();
 }
 
-export async function apiExportData(accessToken: string): Promise<{ message: string }> {
+/** Downloads EmotionAI user data as a JSON file (browser save dialog). */
+export async function apiExportData(accessToken: string): Promise<void> {
   const res = await fetch(`${API_URL}/api/settings/export-data/`, {
     method: 'POST',
     headers: {
@@ -778,13 +824,32 @@ export async function apiExportData(accessToken: string): Promise<{ message: str
   });
 
   if (!res.ok) {
-    throw new Error('Failed to request data export.');
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Failed to download data export.');
   }
 
-  return res.json();
+  const blob = await res.blob();
+  let filename = 'emotionai_export.json';
+  const cd = res.headers.get('Content-Disposition');
+  if (cd) {
+    const match = /filename="?([^";]+)"?/i.exec(cd);
+    if (match?.[1]) filename = match[1].trim();
+  }
+  const url = URL.createObjectURL(blob);
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
-export async function apiDeleteAccount(accessToken: string): Promise<{ message: string }> {
+export async function apiDeleteAccount(accessToken: string): Promise<{ message: string; deleted?: boolean }> {
   const res = await fetch(`${API_URL}/api/settings/delete-account/`, {
     method: 'POST',
     headers: {
@@ -793,7 +858,7 @@ export async function apiDeleteAccount(accessToken: string): Promise<{ message: 
   });
 
   if (!res.ok) {
-    throw new Error('Failed to request account deletion.');
+    throw new Error('Failed to delete account.');
   }
 
   return res.json();

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Play, Pause, SkipForward, Volume2, Heart, Music, Clock, TrendingUp, Loader2, ExternalLink } from 'lucide-react';
 import { apiGetPersonalizedRecommendations, apiSendRecommendationFeedback, apiGetRecommendationSettings, type SpotifyTrack, type RecommendationSettings } from '@/lib/api';
@@ -15,6 +15,8 @@ interface Track {
   bpm: number;
   coverColor: string;
   url?: string;
+  youtubeUrl?: string;
+  youtubeSearchUrl?: string;
   preview_url?: string | null;
   coverImage?: string | null;
 }
@@ -85,6 +87,50 @@ function normalizeSpotifyLink(url?: string | null): string | undefined {
   return undefined;
 }
 
+function normalizeYouTubeEmbedLink(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return undefined;
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  let videoId = '';
+
+  if (host.includes('youtu.be')) {
+    videoId = parsed.pathname.replace('/', '').trim();
+  } else if (host.includes('youtube.com')) {
+    if (parsed.pathname.startsWith('/watch')) {
+      videoId = (parsed.searchParams.get('v') || '').trim();
+    } else if (parsed.pathname.startsWith('/shorts/')) {
+      videoId = parsed.pathname.replace('/shorts/', '').split('/')[0].trim();
+    } else if (parsed.pathname.startsWith('/embed/')) {
+      videoId = parsed.pathname.replace('/embed/', '').split('/')[0].trim();
+    }
+  }
+
+  if (!videoId) return undefined;
+  return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
+}
+
+function normalizeYouTubeSearchLink(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return undefined;
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  if (!host.includes('youtube.com') || !parsed.pathname.startsWith('/results')) return undefined;
+  const query = (parsed.searchParams.get('search_query') || '').trim();
+  if (!query) return undefined;
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+}
+
 function spotifyToTrack(t: SpotifyTrack, idx: number, emotion: string): Track {
   // Handle album as either string or object (API returns flat string)
   const albumImage = typeof t.album === 'object' && t.album?.images?.[0]?.url
@@ -102,12 +148,14 @@ function spotifyToTrack(t: SpotifyTrack, idx: number, emotion: string): Track {
     bpm: t.bpm || 0,
     coverColor: EMOTION_COVER_COLORS[emotion] || 'bg-purple-500',
     url: normalizeSpotifyLink(t.url),
+    youtubeUrl: normalizeYouTubeEmbedLink(t.url),
+    youtubeSearchUrl: normalizeYouTubeSearchLink(t.url),
     preview_url: t.preview_url,
     coverImage,
   };
 }
 
-export default function MusicPage() {
+function MusicPageContent() {
   const searchParams = useSearchParams();
 
   // Valid tab keys on this page
@@ -262,8 +310,14 @@ export default function MusicPage() {
     };
 
     if (currentTrack?.id === track.id) {
+      if (track.youtubeUrl) {
+        setIsPlaying(prev => !prev);
+        return;
+      }
+
       if (!audioRef.current || !track.preview_url) {
-        if (track.url) window.open(track.url, '_blank', 'noopener,noreferrer');
+        const fallbackLink = track.youtubeSearchUrl || track.url;
+        if (fallbackLink) window.open(fallbackLink, '_blank', 'noopener,noreferrer');
         return;
       }
 
@@ -278,6 +332,13 @@ export default function MusicPage() {
     } else {
       stopCurrentAudio();
       setCurrentTrack(track);
+
+      if (track.youtubeUrl) {
+        setTrackDuration(0);
+        setCurrentTime(0);
+        setIsPlaying(true);
+        return;
+      }
 
       if (track.preview_url) {
         const audio = new Audio(track.preview_url);
@@ -303,8 +364,9 @@ export default function MusicPage() {
       }
 
       // No preview available, open Spotify directly.
-      if (track.url) {
-        window.open(track.url, '_blank', 'noopener,noreferrer');
+      const fallbackLink = track.youtubeSearchUrl || track.url;
+      if (fallbackLink) {
+        window.open(fallbackLink, '_blank', 'noopener,noreferrer');
       }
       setIsPlaying(false);
     }
@@ -500,7 +562,18 @@ export default function MusicPage() {
               {currentTrack ? (
                 <>
                   {/* Art */}
-                  {currentTrack.coverImage
+                  {currentTrack.youtubeUrl && isPlaying ? (
+                    <div className="w-full aspect-square bg-black">
+                      <iframe
+                        title={`${currentTrack.title} - YouTube player`}
+                        src={currentTrack.youtubeUrl}
+                        className="h-full w-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        referrerPolicy="strict-origin-when-cross-origin"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : currentTrack.coverImage
                     ? <img src={currentTrack.coverImage} alt={currentTrack.title} className="w-full aspect-square object-cover" />
                     : <div className={`w-full aspect-square ${currentTrack.coverColor} flex items-center justify-center`}>
                         <Music className="w-16 h-16 text-white/60" />
@@ -541,8 +614,10 @@ export default function MusicPage() {
                     </div>
                     {currentTrack.url && (
                       <a href={currentTrack.url} target="_blank" rel="noopener noreferrer"
-                        className="mt-3 flex items-center justify-center gap-2 w-full py-2 bg-[#1DB954] text-white rounded-lg text-xs font-semibold hover:bg-[#1aa34a] transition-colors">
-                        <ExternalLink className="w-3.5 h-3.5" /> Listen on Spotify
+                        className={`mt-3 flex items-center justify-center gap-2 w-full py-2 text-white rounded-lg text-xs font-semibold transition-colors ${
+                          currentTrack.youtubeUrl ? 'bg-[#FF0000] hover:bg-[#cc0000]' : 'bg-[#1DB954] hover:bg-[#1aa34a]'
+                        }`}>
+                        <ExternalLink className="w-3.5 h-3.5" /> {currentTrack.youtubeUrl ? 'Open on YouTube' : 'Listen on Spotify'}
                       </a>
                     )}
                   </div>
@@ -598,5 +673,19 @@ export default function MusicPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function MusicPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" aria-label="Loading" />
+        </div>
+      }
+    >
+      <MusicPageContent />
+    </Suspense>
   );
 }

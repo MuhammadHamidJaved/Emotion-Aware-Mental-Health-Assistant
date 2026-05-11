@@ -1,8 +1,12 @@
 """
 Settings API endpoints with AES-256 encryption
 """
-import requests
+import json
 import logging
+import re
+
+import requests
+from django.http import HttpResponse
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from django.conf import settings as django_settings
@@ -121,28 +125,35 @@ def settings_appearance(request):
 @permission_classes([IsAuthenticated])
 def settings_export_data(request):
     """
-    Export user data
+    Export user data as a downloadable JSON file.
     POST /api/settings/export-data/
     """
-    # TODO: Implement data export functionality
-    return ok_response({
-        'message': 'Data export requested. You will receive an email with your data shortly.'
-    })
+    from users.services.data_export_service import build_user_data_export
+
+    payload = build_user_data_export(request.user)
+    body = json.dumps(payload, indent=2, default=str)
+    safe_slug = re.sub(r'[^a-zA-Z0-9_-]+', '_', request.user.email.split('@')[0])[:80] or 'user'
+    filename = f'emotionai_export_{safe_slug}.json'
+
+    response = HttpResponse(body, content_type='application/json; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
 
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def settings_delete_account(request):
     """
-    Delete user account
+    Permanently delete the user account and related data (CASCADE).
     POST /api/settings/delete-account/
     """
     user = request.user
-    
-    # TODO: Implement proper account deletion with confirmation
-    # For now, just mark as deleted or soft delete
+    user_id = user.pk
+    user.delete()
+    logger.info('User account deleted id=%s', user_id)
     return ok_response({
-        'message': 'Account deletion requested. You will receive a confirmation email.'
+        'message': 'Your account and associated data have been permanently deleted.',
+        'deleted': True,
     })
 
 
@@ -174,7 +185,7 @@ def settings_recommendations(request):
 
 
 RECOMMENDATION_MICROSERVICE_URL = getattr(
-    django_settings, 'RECOMMENDATION_MICROSERVICE_URL', 'http://localhost:5001/api'
+    django_settings, 'RECOMMENDATION_MICROSERVICE_URL', 'http://localhost:5000/api'
 )
 
 MUSIC_LANGUAGES = [

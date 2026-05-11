@@ -7,6 +7,9 @@ from django.utils import timezone
 
 from assistant.models import CheckInEntry
 
+from recommendations.notification_dispatcher import NotificationDispatcher
+from recommendations.notification_service import NotificationService
+
 logger = logging.getLogger(__name__)
 
 
@@ -105,9 +108,6 @@ class EntrySideEffectsService:
 
     @staticmethod
     def create_notifications_and_update_stats(entry, user, notification_service=None):
-        if not notification_service:
-            return
-
         try:
             streak = EntrySideEffectsService._calculate_current_streak(user)
 
@@ -120,19 +120,30 @@ class EntrySideEffectsService:
                 user.longest_streak = streak
             user.save()
 
-            if notification_service.should_send_notification(user, 'streak_alert'):
+            if NotificationService.should_send_notification(user, 'streak_alert'):
                 milestone_streaks = [3, 7, 14, 30, 50, 100]
                 if streak in milestone_streaks:
-                    notification_service.create_streak_alert(user, streak)
+                    NotificationDispatcher.dispatch(
+                        user=user,
+                        notification_type='streak_alert',
+                        title=f'🔥 {streak} day streak!',
+                        message=(
+                            f'Amazing! You\'ve logged your emotions for {streak} days in a row. '
+                            'Keep it up!'
+                        ),
+                        action_url='/dashboard',
+                        metadata={'streak_count': streak},
+                    )
 
-            if notification_service.should_send_notification(user, 'system'):
-                notification_service.create_notification(
+            if NotificationService.should_send_notification(user, 'system'):
+                NotificationDispatcher.dispatch(
                     user=user,
                     notification_type='system',
                     title='Entry saved successfully',
                     message=f'Your {entry.entry_type} entry has been saved.',
                     action_url=f'/check-in/{entry.id}',
-                    related_object_id=entry.id
+                    related_object_id=entry.id,
+                    channels=('in_app',),
                 )
 
         except Exception as exc:
