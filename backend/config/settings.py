@@ -212,15 +212,18 @@ SIMPLE_JWT = {
     'UPDATE_LAST_LOGIN': True,
 }
 
-# CORS Settings
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
-# Optional: e.g. http://192.168.1.10:3000 (same origin you open on the phone)
-_cors_extra = config('CORS_ALLOWED_ORIGINS_EXTRA', default='')
-if _cors_extra.strip():
-    CORS_ALLOWED_ORIGINS += [o.strip() for o in _cors_extra.split(',') if o.strip()]
+# CORS — comma-separated allowed origins from env (no hardcoded production URLs).
+# Example in .env / Render:
+#   CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,https://your-app.vercel.app
+_default_cors = 'http://localhost:3000,http://127.0.0.1:3000'
+_cors_raw = config('CORS_ALLOWED_ORIGINS', default=_default_cors).strip()
+CORS_ALLOWED_ORIGINS = [o.strip() for o in _cors_raw.split(',') if o.strip()]
+# Optional legacy: append extra origins (older deployments / Render blueprints).
+_cors_extra = config('CORS_ALLOWED_ORIGINS_EXTRA', default='').strip()
+if _cors_extra:
+    for origin in (o.strip() for o in _cors_extra.split(',') if o.strip()):
+        if origin not in CORS_ALLOWED_ORIGINS:
+            CORS_ALLOWED_ORIGINS.append(origin)
 
 # In DEBUG, allow typical LAN dev URLs and HTTPS tunnels (ngrok / Cloudflare) for mobile camera testing
 if DEBUG:
