@@ -16,18 +16,19 @@ pywebpush==1.14.1
 #   langchain-google-genai   → langchain-core>=0.3.37,<0.4
 #   langchain-pinecone 0.2.13→ langchain-core>=0.3.34        AND langchain-openai>=0.3.11
 #   langchain-openai 0.3.12  → langchain-core>=0.3.49,<1.0  (pinned to avoid 1.x series)
+#   langchain-google-genai   → 2.0.10 keeps google-generativeai, which provides google.generativeai
 #   langchain-huggingface    → 0.1.2 needs core>=0.3.15,<0.4 (0.3.1 needs >=0.3.70 which breaks others)
 #   langchain-core 0.3.63    → satisfies ALL upper/lower bounds above
 langchain-core==0.3.63
 langchain==0.3.7
 langchain-pinecone==0.2.13
 langchain-openai==0.3.12
-langchain-google-genai==2.0.11
+langchain-google-genai==2.0.10
+google-generativeai==0.8.5
 langchain-huggingface==0.1.2
 # Vector store and AI
 # Use newer pinecone package (not pinecone-client) for langchain-pinecone compatibility
 pinecone[grpc]>=6.0.0
-# google-generativeai will be installed by langchain-google-genai
 # Embeddings
 sentence-transformers==2.7.0
 torch==2.4.1
