@@ -17,6 +17,9 @@ services:
         sync: false
       - key: ALLOWED_HOSTS
         sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      # Optional legacy; merged into CORS_ALLOWED_ORIGINS if set.
       - key: CORS_ALLOWED_ORIGINS_EXTRA
         sync: false
       - key: FRONTEND_URL
